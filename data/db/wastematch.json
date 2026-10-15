@@ -55,6 +55,28 @@
       "role": "seller",
       "createdAt": "2026-10-15T14:19:29.703Z",
       "updatedAt": "2026-10-15T14:19:29.703Z"
+    },
+    {
+      "id": "usr_bd14b8f9-4c16-4322-bedd-03afb1200b13",
+      "email": "test.operator.1792075655170@tatasteel.com",
+      "passwordHash": "a5da685bca3df9316846d7b02f50c0cce23953edd3ef4561193547f1cc180ed692b61c36d30d0571689d6be518d7c876239127deea001f7713215cd53419cc84",
+      "salt": "7b3d591ecd516f3a12a7bbdfacc1a74d",
+      "companyName": "Tata Steel Tubes Division",
+      "location": "Pune, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:47:35.170Z",
+      "updatedAt": "2026-10-15T14:47:35.171Z"
+    },
+    {
+      "id": "usr_a937b045-7781-4a4f-afc1-51b25c713096",
+      "email": "competitor.1792075655176@jsw.in",
+      "passwordHash": "a5da685bca3df9316846d7b02f50c0cce23953edd3ef4561193547f1cc180ed692b61c36d30d0571689d6be518d7c876239127deea001f7713215cd53419cc84",
+      "salt": "7b3d591ecd516f3a12a7bbdfacc1a74d",
+      "companyName": "JSW Steel Processing",
+      "location": "Mumbai, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:47:35.176Z",
+      "updatedAt": "2026-10-15T14:47:35.176Z"
     }
   ],
   "listings": [
@@ -140,6 +162,79 @@
       "id": "evt_b1dac4e6-8713-4520-9217-2cb887ddc747",
       "createdAt": "2026-10-15T14:19:29.707Z",
       "updatedAt": "2026-10-15T14:19:29.707Z"
+    },
+    {
+      "listingId": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+      "eventType": "listing.created",
+      "status": "pending",
+      "attempts": 1,
+      "webhookUrl": "https://akshra-s2007.app.n8n.cloud/webhook/waste-match-event",
+      "payload": {
+        "eventId": "evt_1792075655179_49209352",
+        "eventType": "listing.created",
+        "timestamp": "2026-10-15T14:47:35.179Z",
+        "source": "wastematch-ai",
+        "listingId": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+        "listing": {
+          "id": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+          "materialName": "Cotton Textile Lint Residue",
+          "materialCategory": "Post-Industrial Polymers",
+          "quantityTonnes": 25,
+          "quantityKg": 25000,
+          "unit": "tonnes",
+          "location": "Pune, Maharashtra",
+          "expectedPricePerUnit": 18000,
+          "contamination": "Low",
+          "composition": "PP 97%, Masterbatch 3%"
+        },
+        "Waste category": "Plastic",
+        "Waste description": "Cotton Textile Lint Residue. PP 97%, Masterbatch 3%. Baled PP sacks from grain packaging line.",
+        "Condition": "Clean and sorted",
+        "Quantity (kg)": 25000,
+        "Location": "Pune, Maharashtra",
+        "Photo URL": "",
+        "Contact email": "test.operator.1792075655170@tatasteel.com"
+      },
+      "id": "evt_5c839936-e6ad-4f5a-8db3-1c8d0b7e1713",
+      "createdAt": "2026-10-15T14:47:35.179Z",
+      "updatedAt": "2026-10-15T14:47:35.179Z"
+    },
+    {
+      "listingId": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+      "eventType": "listing.created",
+      "status": "failed",
+      "attempts": 2,
+      "lastError": "n8n responded with HTTP status 500 Internal Server Error",
+      "webhookUrl": "https://akshra-s2007.app.n8n.cloud/webhook/waste-match-event",
+      "payload": {
+        "eventId": "evt_1792075655179_49209352",
+        "eventType": "listing.created",
+        "timestamp": "2026-10-15T14:47:35.179Z",
+        "source": "wastematch-ai",
+        "listingId": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+        "listing": {
+          "id": "lst_8de9d8e1-308b-4c08-ac6d-ce7450184dae",
+          "materialName": "Cotton Textile Lint Residue",
+          "materialCategory": "Post-Industrial Polymers",
+          "quantityTonnes": 25,
+          "quantityKg": 25000,
+          "unit": "tonnes",
+          "location": "Pune, Maharashtra",
+          "expectedPricePerUnit": 18000,
+          "contamination": "Low",
+          "composition": "PP 97%, Masterbatch 3%"
+        },
+        "Waste category": "Plastic",
+        "Waste description": "Cotton Textile Lint Residue. PP 97%, Masterbatch 3%. Baled PP sacks from grain packaging line.",
+        "Condition": "Clean and sorted",
+        "Quantity (kg)": 25000,
+        "Location": "Pune, Maharashtra",
+        "Photo URL": "",
+        "Contact email": "test.operator.1792075655170@tatasteel.com"
+      },
+      "id": "evt_7ae6724f-d8a3-4986-a54a-bc18f532119f",
+      "createdAt": "2026-10-15T14:47:39.611Z",
+      "updatedAt": "2026-10-15T14:47:39.611Z"
     }
   ]
 }

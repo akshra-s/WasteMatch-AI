@@ -1,185 +1,711 @@
 {
-  "name": "WasteMatch AI - Listing Processing & Circular Matching Pipeline",
+  "name": "WasteMatch AI - Waste-to-Industry Matching",
   "nodes": [
     {
       "parameters": {
-        "httpMethod": "POST",
-        "path": "waste-match-event",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "id": "node-webhook-trigger",
-      "name": "Webhook Trigger",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        200,
-        300
-      ],
-      "webhookId": "waste-match-event-webhook"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Step 1: Validate incoming WasteMatch AI event\nconst body = $input.first().json.body || $input.first().json;\n\nif (!body || !body.eventId || !body.listing) {\n  throw new Error('Invalid payload: Missing eventId or listing object');\n}\n\nconst listing = body.listing;\nif (!listing.id || !listing.materialName || typeof listing.quantityTonnes !== 'number') {\n  throw new Error('Invalid listing: Requires id, materialName, and quantityTonnes');\n}\n\nreturn [{\n  json: {\n    eventId: body.eventId,\n    eventType: body.eventType || 'listing.created',\n    listingId: listing.id,\n    materialName: listing.materialName,\n    materialCategory: listing.materialCategory || 'General Industrial',\n    quantityTonnes: Number(listing.quantityTonnes),\n    location: listing.location || 'Pune, India',\n    expectedPrice: listing.expectedPricePerUnit || 0,\n    contamination: listing.contamination || 'Low',\n    receivedAt: new Date().toISOString()\n  }\n}];"
-      },
-      "id": "node-validate-payload",
-      "name": "Validate & Normalize Event",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        420,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.WASTEMATCH_API_URL || 'http://localhost:3000' }}/api/match-waste",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "formTitle": "WasteMatch AI - Find a reuse match for your waste",
+        "formDescription": "Tell us about the material you want to give away. WasteMatch AI classifies it, suggests reuse opportunities and lists potentially compatible recyclers. Demo: recycler records are SAMPLE data.",
+        "formFields": {
+          "values": [
             {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"wasteType\": \"{{ $json.materialName }}\",\n  \"quantityTonnes\": {{ $json.quantityTonnes }},\n  \"location\": \"{{ $json.location }}\",\n  \"contaminationPercentage\": 5\n}",
-        "options": {
-          "timeout": 10000
-        }
-      },
-      "id": "node-query-matching-api",
-      "name": "Query WasteMatch Facility Matching API",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        640,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const prev = $('Validate & Normalize Event').first().json;\nconst matchResponse = $input.first().json;\nconst matches = matchResponse.data || [];\n\nconst topMatch = matches[0] || null;\nconst summary = topMatch \n  ? `Matched with ${topMatch.facilityName} (${topMatch.distanceKm} km away) with score ${topMatch.matchScore}%. Potential CO2 avoidance: ${topMatch.estimatedAvoidedCo2Tonnes || 0} tonnes.`\n  : 'No regional facility matches found currently.';\n\nreturn [{\n  json: {\n    eventId: prev.eventId,\n    listingId: prev.listingId,\n    materialName: prev.materialName,\n    quantityTonnes: prev.quantityTonnes,\n    matchedCount: matches.length,\n    topMatchFacility: topMatch ? topMatch.facilityName : null,\n    summaryNotes: summary,\n    matches: matches.slice(0, 3)\n  }\n}];"
-      },
-      "id": "node-format-enrichment",
-      "name": "Enrich Outcome & Metrics",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        860,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.WASTEMATCH_API_URL || 'http://localhost:3000' }}/api/automation/callback",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
+              "fieldLabel": "Waste category",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Plastic"
+                  },
+                  {
+                    "option": "Paper"
+                  },
+                  {
+                    "option": "Metal"
+                  },
+                  {
+                    "option": "E-waste"
+                  },
+                  {
+                    "option": "Organic waste"
+                  },
+                  {
+                    "option": "Glass"
+                  },
+                  {
+                    "option": "Other"
+                  }
+                ]
+              },
+              "requiredField": true
             },
             {
-              "name": "X-Webhook-Secret",
-              "value": "={{ $env.N8N_WEBHOOK_SECRET || '' }}"
+              "fieldLabel": "Waste description",
+              "fieldType": "textarea",
+              "placeholder": "e.g. 40 clear PET water bottles, labels on, rinsed",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Condition",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Clean and sorted"
+                  },
+                  {
+                    "option": "Mixed or contaminated"
+                  },
+                  {
+                    "option": "Damaged or broken"
+                  },
+                  {
+                    "option": "Unknown / not sure"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Quantity (kg)",
+              "fieldType": "number",
+              "placeholder": "e.g. 25",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Location",
+              "placeholder": "City, State (e.g. Bengaluru, Karnataka)",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Photo URL",
+              "placeholder": "Optional public image link (https://...)"
+            },
+            {
+              "fieldLabel": "Contact email",
+              "fieldType": "email",
+              "placeholder": "Optional - to receive a copy of results"
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"eventId\": \"{{ $json.eventId }}\",\n  \"listingId\": \"{{ $json.listingId }}\",\n  \"status\": \"success\",\n  \"notes\": \"{{ $json.summaryNotes }}\",\n  \"matches\": {{ JSON.stringify($json.matches) }}\n}",
-        "options": {}
+        "responseMode": "lastNode",
+        "options": {
+          "buttonLabel": "Find matches",
+          "path": "wastematch-ai-v2"
+        }
       },
-      "id": "node-notify-backend-callback",
-      "name": "Send Outcome Callback to WasteMatch",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "ceb0ddaf-6bf7-49fe-96db-29c3f482f7a4",
+      "name": "Waste Submission Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
       "position": [
-        1080,
-        300
+        0,
+        96
+      ],
+      "webhookId": "787f2d4c-315e-4f12-be8d-8fe83a72b7d8"
+    },
+    {
+      "parameters": {
+        "jsCode": "const f = $input.first().json;\nfunction s(v) { return v === undefined || v === null ? '' : String(v).trim(); }\nfunction noBraces(t) { return t.split('{').join('(').split('}').join(')'); }\nconst errors = [];\nconst warnings = [];\nconst missing = [];\n\nconst categoryLabel = s(f['Waste category']);\nconst CAT_MAP = { 'plastic': 'plastic', 'paper': 'paper', 'metal': 'metal', 'e-waste': 'e-waste', 'organic waste': 'organic waste', 'glass': 'glass', 'other': 'other' };\nconst category = CAT_MAP[categoryLabel.toLowerCase()] || '';\nif (!category) errors.push('Waste category is missing or not recognised.');\n\nconst description = noBraces(s(f['Waste description']));\nif (description.length < 10) errors.push('Please describe the waste in at least 10 characters (what it is and what it is made of).');\n\nconst condition = s(f['Condition']) || 'Unknown / not sure';\nif (condition.indexOf('Unknown') === 0) missing.push('Condition of the material (clean, mixed or damaged)');\n\nlet qRaw = s(f['Quantity (kg)']).toLowerCase().split(',').join('').split('kg').join('').trim();\nlet mult = 1;\nif (qRaw.endsWith('k')) { mult = 1000; qRaw = qRaw.slice(0, -1); }\nconst qty = parseFloat(qRaw) * mult;\nconst qtyOk = isFinite(qty) && qty > 0;\nif (!qtyOk) errors.push('Quantity must be a number greater than 0 (in kg).');\n\nconst location = noBraces(s(f['Location']));\nif (location.length < 2) errors.push('Location is required (city and state/region).');\n\nlet email = s(f['Contact email']);\nif (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) {\n  warnings.push('The email address looks invalid, so no email will be sent.');\n  email = '';\n}\n\nlet photo = s(f['Photo URL']);\nif (photo && !/^https?:\\/\\//i.test(photo)) {\n  warnings.push('Photo URL must start with http:// or https:// - it was ignored.');\n  photo = '';\n}\nif (!photo) missing.push('Photo of the material (optional, can improve classification)');\n\nconst errorsHtml = errors.map(function (e) { return '<li>' + e.split('<').join('&lt;') + '</li>'; }).join('');\n\nreturn [{ json: {\n  is_valid: errors.length === 0,\n  errors: errors,\n  errors_html: errorsHtml,\n  warnings: warnings,\n  missing_info: missing,\n  category: category,\n  category_label: categoryLabel,\n  description: description,\n  condition: condition,\n  quantity_kg: qtyOk ? Math.round(qty * 100) / 100 : null,\n  location: location,\n  email: email,\n  photo_url: photo,\n  submitted_at: s(f.submittedAt)\n} }];"
+      },
+      "id": "bde7d3c2-e217-4caf-958d-446b9570120b",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        224
       ]
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\n  \"ok\": true,\n  \"status\": \"completed\",\n  \"eventId\": \"{{ $json.eventId }}\",\n  \"listingId\": \"{{ $json.listingId }}\",\n  \"matchesFound\": {{ $json.matchedCount || 0 }},\n  \"processedAt\": \"{{ new Date().toISOString() }}\"\n}",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.is_valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "58189017-f8bf-4f1d-bf08-4fa1a1c26716",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "photo",
+              "leftValue": "={{ $json.photo_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c0954735-c1fa-4609-b09e-99ce2446be1b",
+      "name": "Has Photo URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Waste category selected by user: {{ $json.category_label }}\nDescription: {{ $json.description }}\nCondition reported: {{ $json.condition }}\nQuantity: {{ $json.quantity_kg }} kg\nLocation: {{ $json.location }}\nPhoto: {{ $json.photo_url ? \"attached as an image\" : \"none provided\" }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are WasteMatch AI, a careful waste-material classification assistant. Analyse the submitted waste and return ONLY one JSON object (no markdown, no commentary) with exactly these keys: material_type (one of: plastic, paper, metal, e-waste, organic waste, glass, other), subtype (string such as PET bottles, corrugated cardboard, aluminium cans, or unknown), condition_assessment (string), confidence (low, medium or high), recyclability_notes (string), certainty_caveat (string), contamination_risks (array of strings), reuse_industries (array of strings), value_opportunities (array of objects with keys product, industry, explanation), handling_precautions (array of strings), missing_information (array of strings), match_keywords (array of short lowercase material words such as pet, hdpe, cardboard, aluminium, copper, textile, food waste). Rules: never state that a material is definitely recyclable when its composition or condition is unclear - use wording like may be, potentially, subject to processor acceptance. Do not invent prices, market values, buyers or organisation names. If the description conflicts with the category the user selected, say so in missing_information. If a photo is provided, use it only to support the description. Keep every string under 300 characters."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "messageType": "imageUrl",
+              "imageUrl": "={{ $json.photo_url }}",
+              "imageDetail": "low"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "2a9bb28b-eb28-4f6b-8ced-831bda7d00a0",
+      "name": "AI Classify (Text + Photo)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1024,
+        320
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
         "options": {
-          "responseCode": 200
+          "timeout": 60000,
+          "maxRetries": 1
         }
       },
-      "id": "node-respond-to-webhook",
-      "name": "Respond to Webhook",
-      "type": "n8n-nodes-base.respondToWebhook",
+      "id": "346bedc8-c4f8-4fa3-9a9f-57cd3a6169ab",
+      "name": "AI Model (Image)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        544
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const v = $('Validate Input').first().json;\nconst ai = $input.first().json || {};\nconst CATS = ['plastic', 'paper', 'metal', 'e-waste', 'organic waste', 'glass', 'other'];\nconst RULES = {\n  'plastic': { subtype: 'Plastic - resin type not confirmed', keywords: ['plastic', 'pet', 'hdpe', 'ldpe', 'pp'], industries: ['Plastic recycling and regranulation', 'Recycled-content packaging', 'Construction products such as plastic lumber'], opportunities: [\n    { product: 'Recycled plastic pellets', industry: 'Plastics processing', explanation: 'Clean plastic of a single resin type may be regranulated into pellets for new products, subject to processor acceptance.' },\n    { product: 'Plastic lumber or outdoor furniture', industry: 'Construction and furniture', explanation: 'Some rigid plastics are used in composite boards, depending on processor requirements.' }],\n    notes: 'Recyclability depends on resin type (check the recycling code), cleanliness and whether different plastics are mixed.' },\n  'paper': { subtype: 'Paper or cardboard - grade not confirmed', keywords: ['paper', 'cardboard', 'newspaper', 'office paper'], industries: ['Paper mills', 'Recycled packaging and board', 'Moulded pulp products'], opportunities: [\n    { product: 'Recycled cardboard and packaging board', industry: 'Packaging', explanation: 'Dry, clean paper and cardboard may be pulped into recycled board.' },\n    { product: 'Moulded pulp trays or egg cartons', industry: 'Moulded fibre', explanation: 'Lower-grade paper fibre is sometimes used for moulded pulp items.' }],\n    notes: 'Wet, greasy, waxed or plastic-laminated paper is often not accepted by paper recyclers.' },\n  'metal': { subtype: 'Metal - alloy not confirmed', keywords: ['metal', 'aluminium', 'steel', 'iron', 'copper', 'tin'], industries: ['Scrap metal dealers', 'Smelters and foundries', 'Fabrication workshops'], opportunities: [\n    { product: 'Secondary metal ingots', industry: 'Smelting', explanation: 'Separated ferrous and non-ferrous scrap may be remelted, subject to grade and purity.' },\n    { product: 'Reused fabrication stock', industry: 'Workshops and makers', explanation: 'Usable offcuts or sheets may be reused directly in small fabrication.' }],\n    notes: 'Value and acceptance depend on metal type, separation and contamination (paint, plastic, oil).' },\n  'e-waste': { subtype: 'Electronic waste - device types not confirmed', keywords: ['e-waste', 'electronics', 'batteries', 'circuit boards', 'cables'], industries: ['Authorised e-waste recyclers', 'Refurbishment and repair', 'Precious-metal recovery'], opportunities: [\n    { product: 'Refurbished devices or spare parts', industry: 'Repair and refurbishment', explanation: 'Working or repairable devices may have reuse potential before recycling.' },\n    { product: 'Recovered metals from boards and cables', industry: 'Materials recovery', explanation: 'Authorised recyclers may recover copper and other metals from components.' }],\n    notes: 'E-waste can contain hazardous parts (batteries, screens). Use authorised handlers only; batteries may need separate handling.' },\n  'organic waste': { subtype: 'Organic waste - composition not confirmed', keywords: ['organic waste', 'food waste', 'garden waste', 'biomass'], industries: ['Composting', 'Biogas plants', 'Animal feed (only where regulations allow)'], opportunities: [\n    { product: 'Compost or soil conditioner', industry: 'Agriculture and landscaping', explanation: 'Segregated organic waste may be composted if free of plastics and contaminants.' },\n    { product: 'Biogas feedstock', industry: 'Renewable energy', explanation: 'Food and agricultural waste can potentially feed anaerobic digesters.' }],\n    notes: 'Organic waste degrades quickly; contamination with plastics or chemicals often makes it unsuitable.' },\n  'glass': { subtype: 'Glass - type and colour not confirmed', keywords: ['glass', 'bottles', 'jars', 'cullet'], industries: ['Glass manufacturing (cullet)', 'Construction aggregates', 'Decorative and craft reuse'], opportunities: [\n    { product: 'Cullet for new glass containers', industry: 'Glass manufacturing', explanation: 'Container glass sorted by colour may be crushed into cullet, subject to acceptance.' },\n    { product: 'Glass aggregate', industry: 'Construction', explanation: 'Crushed mixed glass is sometimes used as an aggregate substitute.' }],\n    notes: 'Window glass, ceramics, mirrors and heat-resistant glass are usually not accepted with container glass.' },\n  'other': { subtype: 'Unclassified material', keywords: ['other'], industries: ['Specialist recyclers (depends on the actual material)', 'Upcycling and reuse networks'], opportunities: [\n    { product: 'Depends on the material', industry: 'To be determined', explanation: 'Add a more detailed description (what the item is made of) so a better match can be found.' }],\n    notes: 'The material type is unclear, so recyclability cannot be assessed.' }\n};\nfunction arr(x) { return Array.isArray(x) ? x.filter(function (i) { return i !== null && i !== undefined && i !== ''; }) : []; }\nfunction str(x, d) { return (typeof x === 'string' && x.trim()) ? x.trim() : d; }\n\nlet parsed = null;\nlet failReason = '';\nif (ai.error) {\n  failReason = 'AI service error: ' + (typeof ai.error === 'string' ? ai.error : (ai.error.message || 'unknown error'));\n} else {\n  const t = typeof ai.text === 'string' ? ai.text.trim() : '';\n  const a = t.indexOf('{');\n  const b = t.lastIndexOf('}');\n  if (a >= 0 && b > a) {\n    try { parsed = JSON.parse(t.slice(a, b + 1)); } catch (e) { failReason = 'AI returned text that was not valid JSON.'; }\n  } else {\n    failReason = 'AI returned no structured JSON output.';\n  }\n}\n\nlet c;\nif (parsed && typeof parsed === 'object') {\n  let mt = String(parsed.material_type || '').toLowerCase().trim();\n  const notes = [];\n  if (CATS.indexOf(mt) < 0) { notes.push('AI material type was not one of the supported categories; your selected category was used.'); mt = v.category; }\n  let conf = String(parsed.confidence || 'low').toLowerCase();\n  if (['low', 'medium', 'high'].indexOf(conf) < 0) conf = 'low';\n  const opps = arr(parsed.value_opportunities).map(function (o) {\n    return { product: str(o && o.product, 'Not specified'), industry: str(o && o.industry, 'Not specified'), explanation: str(o && o.explanation, '') };\n  });\n  c = {\n    source: 'ai',\n    source_label: 'AI classification (gpt-5-mini)' + (v.photo_url ? ' using description and photo' : ' using description only'),\n    material_type: mt,\n    subtype: str(parsed.subtype, 'unknown'),\n    condition_assessment: str(parsed.condition_assessment, v.condition),\n    confidence: conf,\n    recyclability_notes: str(parsed.recyclability_notes, ''),\n    certainty_caveat: str(parsed.certainty_caveat, ''),\n    contamination_risks: arr(parsed.contamination_risks),\n    reuse_industries: arr(parsed.reuse_industries),\n    value_opportunities: opps.length ? opps : RULES[mt].opportunities,\n    handling_precautions: arr(parsed.handling_precautions),\n    missing_information: arr(parsed.missing_information).concat(notes),\n    match_keywords: arr(parsed.match_keywords).map(function (k) { return String(k).toLowerCase().trim(); })\n  };\n} else {\n  const r = RULES[v.category] || RULES['other'];\n  c = {\n    source: 'rule_based_fallback',\n    source_label: 'RULE-BASED FALLBACK (AI classification unavailable) - based only on the category you selected',\n    material_type: v.category,\n    subtype: r.subtype,\n    condition_assessment: 'As reported by you: ' + v.condition,\n    confidence: 'low',\n    recyclability_notes: r.notes,\n    certainty_caveat: 'This is a generic rule-based estimate. The actual material composition has not been analysed.',\n    contamination_risks: [],\n    reuse_industries: r.industries,\n    value_opportunities: r.opportunities,\n    handling_precautions: [],\n    missing_information: [],\n    match_keywords: r.keywords\n  };\n}\n\nconst cond = v.condition.toLowerCase();\nif (c.confidence !== 'high' || cond.indexOf('mixed') >= 0 || cond.indexOf('unknown') >= 0) {\n  const extra = 'Recyclability is not certain: composition and condition must be confirmed by the receiving organisation.';\n  c.certainty_caveat = c.certainty_caveat ? c.certainty_caveat + ' ' + extra : extra;\n}\nif (c.material_type !== v.category) {\n  c.missing_information.push('AI classified this as ' + c.material_type + ' but you selected ' + v.category_label + '. Please double-check the category.');\n}\nc.missing_information = v.missing_info.concat(c.missing_information);\n\nreturn [{ json: Object.assign({}, v, { classification: c, ai_failure_reason: failReason }) }];"
+      },
+      "id": "c8891e35-5101-4723-a2aa-3317e5846073",
+      "name": "Classification Fallback Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "f0IgoHkFuQA0cy04",
+          "cachedResultName": "wastematch_recyclers"
+        },
+        "returnAll": true
+      },
+      "id": "ec0d02a0-dcf8-4355-8fa9-c8d8a79bd449",
+      "name": "Get Recycler Database",
+      "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1.1,
       "position": [
-        1300,
-        300
+        1328,
+        320
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sub = $('Classification Fallback Handler').first().json;\nconst c = sub.classification;\nconst items = $input.all().map(function (i) { return i.json || {}; });\nconst dbError = items.find(function (r) { return r.error; });\nconst rows = items.filter(function (r) { return r.org_name; });\nconst qty = Number(sub.quantity_kg);\n\nconst primary = [c.material_type, sub.category].filter(function (t, i, a) { return t && t !== 'other' && a.indexOf(t) === i; });\nconst keywords = c.match_keywords.filter(function (k) { return k && primary.indexOf(k) < 0; });\n\nconst compatible = [];\nconst excluded = [];\nrows.forEach(function (r) {\n  const accepted = String(r.accepted_materials || '').toLowerCase().split(',').map(function (a) { return a.trim(); }).filter(Boolean);\n  const primaryHits = primary.filter(function (t) { return accepted.indexOf(t) >= 0; });\n  const keywordHits = keywords.filter(function (k) { return accepted.indexOf(k) >= 0; });\n  if (!primaryHits.length && !keywordHits.length) {\n    excluded.push({ org_name: r.org_name, reason: 'Does not accept ' + (c.material_type || sub.category) });\n    return;\n  }\n  const minQ = Number(r.min_quantity_kg) || 0;\n  const maxQ = Number(r.max_quantity_kg) || 0;\n  if (qty < minQ) { excluded.push({ org_name: r.org_name, reason: 'Quantity ' + qty + ' kg is below its minimum of ' + minQ + ' kg' }); return; }\n  if (maxQ > 0 && qty > maxQ) { excluded.push({ org_name: r.org_name, reason: 'Quantity ' + qty + ' kg is above its maximum of ' + maxQ + ' kg' }); return; }\n  compatible.push(Object.assign({}, r, {\n    material_match: primaryHits.length ? 'category' : 'keyword',\n    matched_terms: primaryHits.concat(keywordHits),\n    min_q: minQ,\n    max_q: maxQ\n  }));\n});\n\nlet status = 'ok';\nif (dbError) status = 'unavailable';\nelse if (!rows.length) status = 'empty';\n\nreturn [{ json: { compatible: compatible, excluded: excluded, database_status: status, database_error: dbError ? String(dbError.error.message || dbError.error) : '', database_count: rows.length } }];"
+      },
+      "id": "bcc198fe-300b-430a-9a9f-e322b95e1751",
+      "name": "Filter Compatible Recyclers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        320
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst sub = $('Classification Fallback Handler').first().json;\nconst loc = String(sub.location || '').toLowerCase();\nconst qty = Number(sub.quantity_kg);\n\nconst scored = d.compatible.map(function (r) {\n  const reasons = [];\n  let materialScore;\n  if (r.material_match === 'category') { materialScore = 50; reasons.push('Accepts ' + r.matched_terms.join(', ') + ' (direct material match)'); }\n  else { materialScore = 35; reasons.push('Accepts related material: ' + r.matched_terms.join(', ')); }\n\n  let qtyScore = 30;\n  if (r.min_q > 0 && qty < r.min_q * 1.5) { qtyScore = 22; reasons.push('Quantity ' + qty + ' kg is just above its ' + r.min_q + ' kg minimum'); }\n  else reasons.push('Quantity ' + qty + ' kg fits its ' + r.min_q + '-' + (r.max_q || 'any') + ' kg range');\n\n  const city = String(r.city || '').toLowerCase().trim();\n  const region = String(r.region || '').toLowerCase().trim();\n  let proxScore = 4;\n  let proximity = 'Different or unknown area';\n  if (city && loc.indexOf(city) >= 0) { proxScore = 20; proximity = 'Same city (location text match)'; }\n  else if (region && loc.indexOf(region) >= 0) { proxScore = 12; proximity = 'Same state/region (location text match)'; }\n  reasons.push(proximity + ' - distance and transport cost not verified');\n\n  return Object.assign({}, r, {\n    score: materialScore + qtyScore + proxScore,\n    score_breakdown: { material: materialScore, quantity: qtyScore, proximity: proxScore },\n    proximity: proximity,\n    explanation: reasons.join('; ') + '.'\n  });\n});\n\nscored.sort(function (a, b) { return b.score - a.score; });\nconst top = scored.slice(0, 3).map(function (r, i) { return Object.assign({}, r, { rank: i + 1 }); });\n\nreturn [{ json: Object.assign({}, d, { top_matches: top, total_compatible: scored.length }) }];"
+      },
+      "id": "79a3d8a6-254d-4b6e-82db-2b1e588ab35b",
+      "name": "Score and Rank Matches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $input.first().json;\nconst sub = $('Classification Fallback Handler').first().json;\nconst c = sub.classification;\nfunction esc(x) { return String(x === undefined || x === null ? '' : x).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;').split('\"').join('&quot;'); }\nfunction list(a) { return a && a.length ? '<ul>' + a.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>' : '<p>None noted.</p>'; }\n\nconst notes = [];\nif (sub.ai_failure_reason) notes.push('AI classification was unavailable (' + sub.ai_failure_reason + '), so a rule-based fallback was used.');\nif (m.database_status === 'unavailable') notes.push('The recycler database could not be read: ' + m.database_error);\nif (m.database_status === 'empty') notes.push('The recycler database is empty - add recycler records to get matches.');\nnotes.push('Distance and transport costs have NOT been verified: no geocoding or routing service is configured, so proximity is based on matching location text only.');\nnotes.push('Organisations marked SAMPLE are fictional demo records, not verified recyclers. Always confirm acceptance criteria, authorisation and terms directly.');\nnotes.push('No prices or guaranteed buyers are implied.');\nsub.warnings.forEach(function (w) { notes.push(w); });\n\nconst oppHtml = c.value_opportunities.map(function (o) {\n  return '<li><b>' + esc(o.product) + '</b> (' + esc(o.industry) + ') - ' + esc(o.explanation) + '</li>';\n}).join('');\n\nlet matchHtml;\nif (m.top_matches.length) {\n  matchHtml = m.top_matches.map(function (r) {\n    const sample = String(r.record_status || '').toUpperCase().indexOf('SAMPLE') >= 0;\n    const contacts = [];\n    if (r.contact_email) contacts.push('Email: ' + esc(r.contact_email));\n    if (r.contact_phone) contacts.push('Phone: ' + esc(r.contact_phone));\n    if (r.website) contacts.push('Website: ' + esc(r.website));\n    return '<div style=\"border:1px solid #ccc;border-radius:6px;padding:10px;margin:8px 0\">' +\n      '<b>#' + r.rank + ' ' + esc(r.org_name) + '</b> - match score ' + r.score + '/100' +\n      (sample ? ' <span style=\"background:#ffe08a;padding:2px 6px;border-radius:4px\">SAMPLE / UNVERIFIED</span>' : '') +\n      '<br>Location: ' + esc([r.city, r.region].filter(Boolean).join(', ')) +\n      '<br>Reuse purpose: ' + esc(r.reuse_purpose) +\n      '<br>Why matched: ' + esc(r.explanation) +\n      '<br>Contact: ' + (contacts.length ? contacts.join(' | ') : 'Not available in database') +\n      '</div>';\n  }).join('');\n} else {\n  matchHtml = '<p><b>No compatible organisations found.</b> ' +\n    (m.database_status === 'ok' ? 'None of the ' + m.database_count + ' records accept this material at this quantity. Try adjusting the quantity, adding more detail, or adding recyclers to the database.' : 'See notes below.') + '</p>';\n}\n\nconst excludedHtml = m.excluded.length ? '<details><summary>' + m.excluded.length + ' organisation(s) excluded as incompatible</summary>' + list(m.excluded.map(function (e) { return e.org_name + ': ' + e.reason; })) + '</details>' : '';\n\nconst html = '<h1>WasteMatch AI results</h1>' +\n  '<h2>1. Your submission</h2><p><b>Category:</b> ' + esc(sub.category_label) + ' | <b>Quantity:</b> ' + esc(sub.quantity_kg) + ' kg | <b>Location:</b> ' + esc(sub.location) + ' | <b>Condition:</b> ' + esc(sub.condition) + '</p>' +\n  '<h2>2. Material understanding</h2><p><i>' + esc(c.source_label) + '</i></p>' +\n  '<p><b>Material:</b> ' + esc(c.material_type) + ' - ' + esc(c.subtype) + ' (confidence: ' + esc(c.confidence) + ')</p>' +\n  '<p><b>Condition assessment:</b> ' + esc(c.condition_assessment) + '</p>' +\n  '<p><b>Recyclability considerations:</b> ' + esc(c.recyclability_notes) + '</p>' +\n  '<p><b>Caveat:</b> ' + esc(c.certainty_caveat) + '</p>' +\n  (c.contamination_risks.length ? '<p><b>Contamination risks:</b></p>' + list(c.contamination_risks) : '') +\n  (c.handling_precautions.length ? '<p><b>Handling precautions:</b></p>' + list(c.handling_precautions) : '') +\n  '<h2>3. Hidden value - potential reuse opportunities</h2><ul>' + oppHtml + '</ul>' +\n  '<p><b>Industries that may reuse it:</b> ' + esc(c.reuse_industries.join(', ')) + '</p>' +\n  '<h2>4. Top compatible matches</h2>' + matchHtml + excludedHtml +\n  '<h2>5. Missing information</h2>' + list(c.missing_information) +\n  '<h2>Important notes</h2>' + list(notes);\n\nconst results = {\n  waste_category: sub.category,\n  classification: c,\n  reuse_opportunities: c.value_opportunities,\n  top_matches: m.top_matches.map(function (r) {\n    return { rank: r.rank, organization: r.org_name, score: r.score, score_breakdown: r.score_breakdown, explanation: r.explanation, city: r.city, region: r.region, reuse_purpose: r.reuse_purpose, record_status: r.record_status, contact_email: r.contact_email || null, contact_phone: r.contact_phone || null, website: r.website || null };\n  }),\n  excluded: m.excluded,\n  missing_information: c.missing_information,\n  notes: notes\n};\n\nreturn [{ json: {\n  results_html: html,\n  email_html: html,\n  email: sub.email,\n  send_email: !!sub.email,\n  match_count: m.top_matches.length,\n  results: results\n} }];"
+      },
+      "id": "b84b48cc-0415-495c-a837-40e4b07ff830",
+      "name": "Format Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "email",
+              "leftValue": "={{ $json.send_email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c78103c3-9197-43ae-a375-41e4a4d94387",
+      "name": "Email Provided?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1856,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Your WasteMatch AI results ({{ $json.match_count }} potential matches)",
+        "message": "={{ $json.email_html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "6244a5c4-315e-4fb1-a157-ed738b10e8a6",
+      "name": "Email Results (Optional)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2080,
+        416
+      ],
+      "webhookId": "544e11fa-dd00-4718-85d1-5780f467896f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "qjgwVv9T7I5WpG6x",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "={{ $(\"Format Results\").first().json.results_html }}"
+      },
+      "id": "34d0227b-6f40-41ea-b27c-2a0288affa72",
+      "name": "Show Results",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1968,
+        96
+      ],
+      "webhookId": "de9a3802-185d-4b06-9767-9eb94df0e90f"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Waste category selected by user: {{ $json.category_label }}\nDescription: {{ $json.description }}\nCondition reported: {{ $json.condition }}\nQuantity: {{ $json.quantity_kg }} kg\nLocation: {{ $json.location }}\nPhoto: {{ $json.photo_url ? \"attached as an image\" : \"none provided\" }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are WasteMatch AI, a careful waste-material classification assistant. Analyse the submitted waste and return ONLY one JSON object (no markdown, no commentary) with exactly these keys: material_type (one of: plastic, paper, metal, e-waste, organic waste, glass, other), subtype (string such as PET bottles, corrugated cardboard, aluminium cans, or unknown), condition_assessment (string), confidence (low, medium or high), recyclability_notes (string), certainty_caveat (string), contamination_risks (array of strings), reuse_industries (array of strings), value_opportunities (array of objects with keys product, industry, explanation), handling_precautions (array of strings), missing_information (array of strings), match_keywords (array of short lowercase material words such as pet, hdpe, cardboard, aluminium, copper, textile, food waste). Rules: never state that a material is definitely recyclable when its composition or condition is unclear - use wording like may be, potentially, subject to processor acceptance. Do not invent prices, market values, buyers or organisation names. If the description conflicts with the category the user selected, say so in missing_information. If a photo is provided, use it only to support the description. Keep every string under 300 characters."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "0e358198-e440-4dfe-9085-45070505e476",
+      "name": "AI Classify (Text Only)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1024,
+        832
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "timeout": 60000,
+          "maxRetries": 1
+        }
+      },
+      "id": "9b49678b-4d06-4f6f-8e71-08519ca47947",
+      "name": "AI Model (Text)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        1056
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "showText",
+        "responseText": "=<h2>Please fix your submission</h2><p>We could not process the form because:</p><ul>{{ $json.errors_html }}</ul><p>Go back to the form and submit again.</p>"
+      },
+      "id": "94d666ce-e808-4f5d-ac6e-8d38a5fd71e3",
+      "name": "Show Validation Errors",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        912,
+        0
+      ],
+      "webhookId": "518ee2b0-bd57-4bdf-8499-f8c6e77e6f40"
     }
   ],
+  "pinData": {},
   "connections": {
-    "Webhook Trigger": {
+    "Waste Submission Form": {
       "main": [
         [
           {
-            "node": "Validate & Normalize Event",
+            "node": "Validate Input",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Validate & Normalize Event": {
+    "Validate Input": {
       "main": [
         [
           {
-            "node": "Query WasteMatch Facility Matching API",
+            "node": "Input Valid?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Query WasteMatch Facility Matching API": {
+    "Input Valid?": {
       "main": [
         [
           {
-            "node": "Enrich Outcome & Metrics",
+            "node": "Has Photo URL?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Show Validation Errors",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Enrich Outcome & Metrics": {
+    "Has Photo URL?": {
       "main": [
         [
           {
-            "node": "Send Outcome Callback to WasteMatch",
+            "node": "AI Classify (Text + Photo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Classify (Text Only)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Outcome Callback to WasteMatch": {
+    "AI Classify (Text + Photo)": {
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Classification Fallback Handler",
             "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Model (Image)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Classify (Text + Photo)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classification Fallback Handler": {
+      "main": [
+        [
+          {
+            "node": "Get Recycler Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recycler Database": {
+      "main": [
+        [
+          {
+            "node": "Filter Compatible Recyclers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Compatible Recyclers": {
+      "main": [
+        [
+          {
+            "node": "Score and Rank Matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score and Rank Matches": {
+      "main": [
+        [
+          {
+            "node": "Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Results": {
+      "main": [
+        [
+          {
+            "node": "Email Provided?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Provided?": {
+      "main": [
+        [
+          {
+            "node": "Email Results (Optional)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Show Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Results (Optional)": {
+      "main": [
+        [
+          {
+            "node": "Show Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Classify (Text Only)": {
+      "main": [
+        [
+          {
+            "node": "Classification Fallback Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Model (Text)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Classify (Text Only)",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     }
   },
+  "active": true,
   "settings": {
-    "executionOrder": "v1"
-  }
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e7ed2d04-bf44-42c0-b8d3-ba3a4e76cb48",
+  "meta": {
+    "instanceId": "a16640ab3c45db41b2fb403d29f24b04bdd5cb75b9263f2fc33fba938bd01132"
+  },
+  "nodeGroups": [
+    {
+      "id": "3ebb69cd-1048-4297-b5de-e7e413237e6a",
+      "name": "Check submission",
+      "nodeIds": [
+        "bde7d3c2-e217-4caf-958d-446b9570120b",
+        "58189017-f8bf-4f1d-bf08-4fa1a1c26716"
+      ],
+      "description": "Cleans the form answers, checks required fields, quantity and email, and lists missing details"
+    },
+    {
+      "id": "f46e8b36-12a7-44eb-9d2e-d17865e582bd",
+      "name": "Understand the material",
+      "nodeIds": [
+        "c0954735-c1fa-4609-b09e-99ce2446be1b",
+        "2a9bb28b-eb28-4f6b-8ced-831bda7d00a0",
+        "346bedc8-c4f8-4fa3-9a9f-57cd3a6169ab",
+        "0e358198-e440-4dfe-9085-45070505e476",
+        "9b49678b-4d06-4f6f-8e71-08519ca47947",
+        "c8891e35-5101-4723-a2aa-3317e5846073"
+      ],
+      "description": "AI reads the description (and photo if given); falls back to labelled rule-based estimates if AI fails"
+    },
+    {
+      "id": "64537a77-7146-45f3-a0eb-5b8240a819a9",
+      "name": "Match and rank recyclers",
+      "nodeIds": [
+        "ec0d02a0-dcf8-4355-8fa9-c8d8a79bd449",
+        "bcc198fe-300b-430a-9a9f-e322b95e1751",
+        "79a3d8a6-254d-4b6e-82db-2b1e588ab35b",
+        "b84b48cc-0415-495c-a837-40e4b07ff830"
+      ],
+      "description": "Reads recycler records, drops incompatible ones, scores by material, quantity and location, builds the report"
+    },
+    {
+      "id": "45661b93-5987-4048-95d3-5b0210afc1bc",
+      "name": "Deliver results",
+      "nodeIds": [
+        "c78103c3-9197-43ae-a375-41e4a4d94387",
+        "6244a5c4-315e-4fb1-a157-ed738b10e8a6",
+        "34d0227b-6f40-41ea-b27c-2a0288affa72"
+      ],
+      "description": "Emails a copy first when a valid address was given (failures never block), then shows the report on screen"
+    }
+  ],
+  "id": "0J93lFutW5jeoUOK",
+  "tags": []
 }

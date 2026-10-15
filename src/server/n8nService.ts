@@ -30,22 +30,51 @@ export async function triggerN8nAutomation(listing: ListingRecord): Promise<{
   const webhookUrl = process.env.N8N_WEBHOOK_URL?.trim();
   const webhookSecret = process.env.N8N_WEBHOOK_SECRET?.trim();
 
-  const eventPayload: AutomationEventPayload = {
+  // Map Waste category into one of n8n form options: Plastic, Paper, Metal, E-waste, Organic waste, Glass, Other
+  const categoryLower = (listing.materialCategory || listing.materialName || '').toLowerCase();
+  let mappedCategory = 'Other';
+  if (/plastic|polymer|pet|hdpe|ldpe|pp|pvc/.test(categoryLower)) mappedCategory = 'Plastic';
+  else if (/paper|cardboard|fibre|kraft/.test(categoryLower)) mappedCategory = 'Paper';
+  else if (/metal|steel|aluminium|iron|copper|slag/.test(categoryLower)) mappedCategory = 'Metal';
+  else if (/e-waste|electronic|pcb|battery/.test(categoryLower)) mappedCategory = 'E-waste';
+  else if (/organic|biomass|food|agri|husk/.test(categoryLower)) mappedCategory = 'Organic waste';
+  else if (/glass|cullet/.test(categoryLower)) mappedCategory = 'Glass';
+
+  const mappedCondition = 
+    listing.contamination === 'None' || listing.contamination === 'Low' ? 'Clean and sorted' :
+    listing.contamination === 'Medium' ? 'Mixed or contaminated' :
+    listing.contamination === 'High' ? 'Damaged or broken' : 'Clean and sorted';
+
+  const quantityKg = Math.round((Number(listing.quantityTonnes) || 1) * 1000);
+  const rawDesc = `${listing.materialName}. ${listing.composition || ''}. ${listing.additionalNotes || ''}`.trim();
+  const description = rawDesc.length >= 10 ? rawDesc : `${rawDesc} - industrial secondary raw material batch`;
+
+  const eventPayload: any = {
     eventId,
     eventType: 'listing.created',
     timestamp: new Date().toISOString(),
     source: 'wastematch-ai',
+    listingId: listing.id,
     listing: {
       id: listing.id,
       materialName: listing.materialName,
       materialCategory: listing.materialCategory,
       quantityTonnes: listing.quantityTonnes,
+      quantityKg,
       unit: listing.unit,
       location: listing.location,
       expectedPricePerUnit: listing.expectedPricePerUnit,
       contamination: listing.contamination,
       composition: listing.composition
-    }
+    },
+    // n8n Form Trigger dual compatibility fields
+    'Waste category': mappedCategory,
+    'Waste description': description,
+    'Condition': mappedCondition,
+    'Quantity (kg)': quantityKg,
+    'Location': listing.location || 'Pune, Maharashtra',
+    'Photo URL': listing.imageUrl || '',
+    'Contact email': listing.userEmail || 'operations@ecocement.in'
   };
 
   // If n8n is not configured, record as skipped and return smoothly
