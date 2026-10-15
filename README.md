@@ -14,7 +14,6 @@ Instead of treating industrial by-products as waste, WasteMatch identifies **pot
 
 ### Team GROK IS THIS TRUE
 
-* **Vishesh Agrawal**
 * **Dishita Singh**
 * **Akshra Srivastava**
 * **Akshara Singh**
