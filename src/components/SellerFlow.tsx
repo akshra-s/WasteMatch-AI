@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Image as ImageIcon, AlertCircle, Cpu } from 'lucide-react';
+import { Upload, CheckCircle2, Sparkles, ArrowRight, ArrowLeft, Image as ImageIcon, AlertCircle, Cpu, Info } from 'lucide-react';
 import { SellerListingPayload, ContaminationLevel, AvailabilityStatus } from '../types';
 import { DEFAULT_SELLER_LISTING } from '../data/mockData';
 import { analyzeWaste, AIAnalyzeResponse } from '../ai/analyzeWaste';
@@ -24,6 +24,7 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalyzeResponse | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<SellerListingPayload>({
     ...DEFAULT_SELLER_LISTING,
@@ -39,6 +40,7 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
     if (step === 2) {
       setIsScanning(true);
       setScanProgress(15);
+      setAiError(null);
 
       const progressInterval = setInterval(() => {
         setScanProgress((prev) => {
@@ -84,10 +86,12 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
               additionalNotes: result.summary || result.compliance?.notes || prev.additionalNotes
             }));
           }
-        } catch {
+        } catch (err: any) {
           if (!isCancelled) {
             setIsScanning(false);
             setScanProgress(100);
+            clearInterval(progressInterval);
+            setAiError(err?.message || 'Gemini Vision service temporarily unavailable.');
           }
         }
       };
@@ -451,6 +455,16 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
                   </div>
                 ) : (
                   <div className="space-y-4 animate-in fade-in duration-300">
+                    {aiError && (
+                      <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs flex items-start gap-2.5">
+                        <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block font-bold text-amber-950">AI Vision Notice:</strong>
+                          <span>{aiError} You can proceed with full manual specification in Step 3.</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Identification Badge */}
                     <div className="bg-[#EBF7F0] p-5 rounded-2xl border border-[#A8DEBF]">
                       <div className="flex items-center justify-between mb-1">

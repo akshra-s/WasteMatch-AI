@@ -118,21 +118,31 @@ export async function optionalAuth(req: AuthenticatedRequest, _res: Response, ne
   next();
 }
 
+import { authRateLimiter } from './rateLimiter';
+
 export const authRouter = express.Router();
 
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)+$/;
+
 /** POST /api/auth/register */
-authRouter.post('/register', async (req: Request, res: Response) => {
+authRouter.post('/register', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password, companyName, location, role } = req.body || {};
 
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
+    if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
       return res.status(400).json({ ok: false, error: 'A valid email address is required.', code: 'INVALID_EMAIL' });
     }
     if (!password || typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ ok: false, error: 'Password must be at least 6 characters long.', code: 'INVALID_PASSWORD' });
     }
+    if (password.length > 128) {
+      return res.status(400).json({ ok: false, error: 'Password cannot exceed 128 characters.', code: 'PASSWORD_TOO_LONG' });
+    }
     if (!companyName || typeof companyName !== 'string' || companyName.trim().length === 0) {
       return res.status(400).json({ ok: false, error: 'Company or organization name is required.', code: 'INVALID_COMPANY' });
+    }
+    if (companyName.trim().length > 120) {
+      return res.status(400).json({ ok: false, error: 'Company name cannot exceed 120 characters.', code: 'COMPANY_TOO_LONG' });
     }
 
     const existing = await db.findUserByEmail(email);
@@ -142,11 +152,11 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
     const { hash, salt } = hashPassword(password);
     const user = await db.createUser({
-      email,
+      email: email.trim(),
       passwordHash: hash,
       salt,
-      companyName,
-      location: location || 'Pune, Maharashtra',
+      companyName: companyName.trim(),
+      location: (typeof location === 'string' && location.trim().length > 0 ? location.trim() : 'Pune, Maharashtra'),
       role: role === 'buyer' ? 'buyer' : 'seller'
     });
 
@@ -172,7 +182,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 });
 
 /** POST /api/auth/login */
-authRouter.post('/login', async (req: Request, res: Response) => {
+authRouter.post('/login', authRateLimiter, async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body || {};
 

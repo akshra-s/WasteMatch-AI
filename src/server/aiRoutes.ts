@@ -28,6 +28,8 @@ import facilitiesData from '../../data/facilities_sample.json';
 
 export const aiRouter: Router = express.Router();
 
+import { aiRateLimiter } from './rateLimiter';
+
 /**
  * POST /analyze-waste
  * Body: {
@@ -38,11 +40,11 @@ export const aiRouter: Router = express.Router();
  *   }
  * }
  */
-aiRouter.post('/analyze-waste', async (req: Request, res: Response) => {
+aiRouter.post('/analyze-waste', aiRateLimiter, async (req: Request, res: Response) => {
   try {
     const { image, userProvided } = req.body || {};
 
-    if (!image || typeof image !== 'string') {
+    if (!image || typeof image !== 'string' || image.trim().length === 0) {
       return res.status(400).json({
         ok: false,
         error: 'Missing `image` (base64 data URL or https URL) in request body.',
@@ -50,12 +52,12 @@ aiRouter.post('/analyze-waste', async (req: Request, res: Response) => {
       });
     }
 
-    const result = await analyzeWaste({ image, userProvided });
+    const result = await analyzeWaste({ image, userProvided }, { allowMockFallback: false });
 
     return res.json({
       ok: true,
       success: true,
-      message: 'Image analyzed successfully',
+      message: 'Image analyzed successfully with Gemini Vision',
       data: {
         ...result,
         wasteType: result.material,
@@ -64,25 +66,46 @@ aiRouter.post('/analyze-waste', async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    // eslint-disable-next-line no-console
-    console.error('[POST /analyze-waste] unexpected error:', err);
-    return res.status(500).json({
+    const errMsg = err?.message || '';
+    const isUnavailable = errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || err?.code === 503;
+    const isRateLimited = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED');
+    const isMissingKey = errMsg.includes('API_KEY_MISSING') || err?.code === 'API_KEY_MISSING';
+    const isBadImage = errMsg.includes('BAD_IMAGE') || err?.code === 'BAD_IMAGE';
+
+    console.warn('[POST /analyze-waste] Gemini analysis failed:', errMsg);
+
+    const statusCode = isBadImage ? 400 : isMissingKey ? 503 : isUnavailable ? 503 : isRateLimited ? 429 : 500;
+    const userMessage = isBadImage
+      ? 'The uploaded image format could not be processed. Please upload a clear JPG or PNG image.'
+      : isMissingKey
+      ? 'Gemini API key is not configured on the server. Please check GEMINI_API_KEY environment secret.'
+      : isUnavailable
+      ? 'Google Gemini Vision service is currently experiencing high demand. Please try again shortly or enter waste specifications manually.'
+      : isRateLimited
+      ? 'Gemini API quota rate limit reached. Please wait a moment before trying again.'
+      : `AI Vision analysis failed: ${errMsg}`;
+
+    return res.status(statusCode).json({
       ok: false,
-      error: err?.message || 'Unexpected server error',
-      code: 'UNKNOWN',
+      error: userMessage,
+      code: isBadImage ? 'BAD_IMAGE' : isMissingKey ? 'API_KEY_MISSING' : isUnavailable ? 'GEMINI_UNAVAILABLE' : isRateLimited ? 'RATE_LIMIT' : 'AI_ERROR',
+      details: errMsg
     });
   }
 });
 
 /**
  * POST /match-waste
- * Body: { composition?, wasteType?, quantityTonnes?, location? }
+ * Body: { composition?, wasteType?, quantityTonnes?, location?, includeSample? }
  */
-aiRouter.post('/match-waste', (req: Request, res: Response) => {
-  const { composition, wasteType, quantityTonnes, location, contaminationPercentage, budgetOrExpectedPrice, isHazardous, topN = 5 } = req.body || {};
+aiRouter.post('/match-waste', async (req: Request, res: Response) => {
+  const { composition, wasteType, quantityTonnes, location, contaminationPercentage, budgetOrExpectedPrice, isHazardous, topN = 5, includeSample = false } = req.body || {};
   const queryWaste = wasteType || (Array.isArray(composition) ? composition.join(' ') : 'PET Plastic');
   const qty = Number(quantityTonnes) || 15;
-  const coords = resolveCoordinates(location || 'Pune, Maharashtra');
+  
+  // Real live geocoding via OpenStreetMap Nominatim
+  const geoResult = await geocodeLocation(String(location || 'Pune, Maharashtra'));
+  const coords = { lat: geoResult.lat, lon: geoResult.lon };
 
   const matches = findTopMatches({
     wasteType: queryWaste,
@@ -92,7 +115,7 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     contaminationPercentage: typeof contaminationPercentage === 'number' ? contaminationPercentage : 5,
     budgetOrExpectedPrice: typeof budgetOrExpectedPrice === 'number' ? budgetOrExpectedPrice : undefined,
     isHazardous: Boolean(isHazardous)
-  }, Number(topN) || 5);
+  }, Number(topN) || 5, { includeSample: Boolean(includeSample) });
 
   const formattedMatches = matches.map((m, idx) => ({
     id: idx + 1,
@@ -101,7 +124,7 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     facilityName: m.facilityName,
     location: m.location,
     distanceKm: m.distanceKm,
-    distanceType: 'straight-line (Haversine formula)',
+    distanceType: 'straight-line (Haversine formula from verified coordinates)',
     matchScore: m.matchScore,
     method: `${m.capacityPerDay} T/day processing capacity for circular reuse`,
     demandLevel: m.matchScore > 85 ? 'High' : 'Medium',
@@ -110,7 +133,9 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     processingType: m.processingType,
     estimatedAvoidedCo2Tonnes: m.estimatedAvoidedCo2Tonnes,
     estimatedEconomicBenefitInr: m.estimatedEconomicBenefitInr,
-    datasetSource: 'SAMPLE_DEMO_DATA (Verified Sample Facilities Specification)'
+    datasetSource: m.sourceDataset,
+    isVerifiedReal: m.isVerifiedReal,
+    regulatoryRegistration: m.regulatoryRegistration
   }));
 
   return res.json({
@@ -118,6 +143,7 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     success: true,
     message: matches.length > 0 ? 'Matches found' : 'No compatible facilities found for this waste stream and constraints',
     count: matches.length,
+    geocodedLocation: geoResult.displayName,
     data: formattedMatches
   });
 });
@@ -201,7 +227,7 @@ aiRouter.get('/ai/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
     aiEngine: 'waste-match-ai',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     geminiConfigured: hasKey,
     mode: hasKey ? 'live' : 'mock-fallback',
     timestamp: new Date().toISOString(),

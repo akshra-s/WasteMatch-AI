@@ -22,15 +22,22 @@ import { normalizeAIResponse } from './schema';
 import { mockAnalyze } from './mockFallback';
 
 export async function analyzeWaste(
-  req: AIAnalyzeRequest
+  req: AIAnalyzeRequest,
+  options?: { allowMockFallback?: boolean }
 ): Promise<AIAnalyzeResponse> {
   const started = Date.now();
+  const allowMock = options?.allowMockFallback ?? false;
 
-  // 1. Basic input guard — if no valid image is provided, use structured fallback
+  // 1. Basic input guard — if no valid image is provided
   if (!req || !req.image || req.image.trim() === '') {
-    const mock = mockAnalyze(req?.userProvided);
-    mock.latencyMs = Date.now() - started;
-    return mock;
+    if (allowMock) {
+      const mock = mockAnalyze(req?.userProvided);
+      mock.latencyMs = Date.now() - started;
+      return mock;
+    }
+    const err: any = new Error('No image provided for waste analysis.');
+    err.code = 'NO_IMAGE';
+    throw err;
   }
 
   // 2. If in browser environment, proxy request to Express server-side route
@@ -74,14 +81,23 @@ export async function analyzeWaste(
           };
           return result;
         }
+      } else {
+        const errorJson = await response.json().catch(() => null);
+        const errMsg = errorJson?.error || `Server responded with status ${response.status}`;
+        const err: any = new Error(errMsg);
+        err.code = errorJson?.code || 'SERVER_ERROR';
+        throw err;
       }
-    } catch (browserFetchErr) {
-      // eslint-disable-next-line no-console
-      console.warn('[AI] Client fetch to /api/analyze-waste failed, falling back to local vision/mock.', browserFetchErr);
+    } catch (browserFetchErr: any) {
+      if (!allowMock) {
+        throw browserFetchErr;
+      }
+      console.warn('[AI] Client fetch to /api/analyze-waste failed, using mock fallback.', browserFetchErr);
     }
   }
 
   // 3. Try real Gemini Vision (runs on server or direct Node runtime).
+  let lastError: any = null;
   try {
     const { text, latencyMs } = await callGeminiVision(
       req.image,
@@ -96,19 +112,23 @@ export async function analyzeWaste(
       return normalized;
     }
 
-    // eslint-disable-next-line no-console
-    console.warn('[AI] Gemini returned unparseable JSON — using fallback.');
+    console.warn('[AI] Gemini returned unparseable JSON.');
+    lastError = new Error('Gemini response could not be parsed into valid schema.');
   } catch (err: any) {
-    // eslint-disable-next-line no-console
     console.warn(
-      `[AI] Gemini call failed (${err?.code || err?.message || 'unknown'}) — using fallback.`
+      `[AI] Gemini call failed (${err?.code || err?.message || 'unknown'}).`
     );
+    lastError = err;
   }
 
-  // 4. Fallback — never break the demo.
-  const mock = mockAnalyze(req.userProvided, req.image);
-  mock.latencyMs = Date.now() - started;
-  return mock;
+  // 4. Do not fake results in production — only use fallback if explicitly allowed
+  if (allowMock) {
+    const mock = mockAnalyze(req.userProvided, req.image);
+    mock.latencyMs = Date.now() - started;
+    return mock;
+  }
+
+  throw lastError || new Error('AI analysis failed.');
 }
 
 // Re-export types for convenient one-line imports

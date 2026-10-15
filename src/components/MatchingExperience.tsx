@@ -335,6 +335,27 @@ export const MatchingExperience: React.FC<MatchingExperienceProps> = ({
                 </motion.div>
 
               </div>
+            ) : matchCandidates.length === 0 ? (
+              /* No Compatible Facilities Found View */
+              <div className="w-full bg-white rounded-3xl p-8 border border-[#D9F2E3] text-center shadow-lg flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-2xs border border-amber-200">
+                  <Info className="w-8 h-8" />
+                </div>
+                <h3 className="font-heading font-extrabold text-2xl text-[#0B3D2E]">
+                  No Matching Facilities Found
+                </h3>
+                <p className="text-xs text-[#3B5446] max-w-sm leading-relaxed font-medium">
+                  No verified industrial facilities currently match this exact material stream, quantity, or location criteria. Try expanding your geographic location or adjusting the material specification.
+                </p>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={onBack}
+                    className="px-5 py-2.5 rounded-xl bg-[#0B3D2E] text-white font-heading font-bold text-xs hover:bg-[#146B4A] transition-colors cursor-pointer shadow-xs"
+                  >
+                    Adjust Criteria
+                  </button>
+                </div>
+              </div>
             ) : (
               /* All Cards Finished View */
               <div className="w-full bg-white rounded-3xl p-8 border border-[#D9F2E3] text-center shadow-lg flex flex-col items-center justify-center space-y-4">

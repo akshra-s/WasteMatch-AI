@@ -26,7 +26,7 @@ export async function triggerN8nAutomation(listing: ListingRecord): Promise<{
   status: 'success' | 'failed' | 'skipped';
   message: string;
 }> {
-  const eventId = `evt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  const eventId = listing.automationEventId || `evt_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const webhookUrl = process.env.N8N_WEBHOOK_URL?.trim();
   const webhookSecret = process.env.N8N_WEBHOOK_SECRET?.trim();
 

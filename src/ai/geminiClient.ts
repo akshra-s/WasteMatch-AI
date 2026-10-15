@@ -124,7 +124,7 @@ async function toInlinePart(image: string): Promise<{
   return { inlineData: { mimeType: 'image/jpeg', data: trimmed.replace(/\s+/g, '') } };
 }
 
-const CANDIDATE_MODELS = ['gemini-2.5-flash', 'gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+const CANDIDATE_MODELS = ['gemini-3.8-flash'];
 
 export interface RawGeminiResult {
   text: string;
@@ -161,8 +161,9 @@ export async function callGeminiVision(
   let lastError: any = null;
 
   for (const modelName of CANDIDATE_MODELS) {
+    let timer: NodeJS.Timeout | null = null;
     try {
-      const response = await ai.models.generateContent({
+      const generatePromise = ai.models.generateContent({
         model: modelName,
         contents: [
           {
@@ -176,6 +177,13 @@ export async function callGeminiVision(
           responseMimeType: 'application/json',
         },
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 7000);
+      });
+
+      const response = await Promise.race([generatePromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
       const latencyMs = Date.now() - started;
 
       // The SDK exposes .text; fall back to walking parts if needed
@@ -191,6 +199,7 @@ export async function callGeminiVision(
         return { text, latencyMs };
       }
     } catch (err: any) {
+      if (timer) clearTimeout(timer);
       lastError = err;
       continue;
     }

@@ -2,7 +2,7 @@ import express, { Response } from 'express';
 import { db } from '../db/database';
 import { requireAuth, optionalAuth, AuthenticatedRequest } from './auth';
 import { triggerN8nAutomation } from './n8nService';
-import { findTopMatches, getFacilityById, resolveCoordinates } from '../matching/matchingEngine';
+import { findTopMatches, getFacilityById, resolveCoordinates, geocodeLocation } from '../matching/matchingEngine';
 import { calculateImpact } from '../matching/impactCalculator';
 import type { ListingRecord, ContaminationLevel, AvailabilityStatus } from '../types';
 
@@ -52,8 +52,9 @@ listingRouter.get('/:id', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Listing not found', code: 'NOT_FOUND' });
     }
 
-    // Generate matches for this specific listing
-    const coords = resolveCoordinates(listing.location);
+    // Generate matches for this specific listing using live geocoding
+    const geo = await geocodeLocation(listing.location);
+    const coords = { lat: geo.lat, lon: geo.lon };
     const contaminationPct =
       listing.contamination === 'None' ? 0 :
       listing.contamination === 'Medium' ? 12 :

@@ -14,7 +14,7 @@ import {
   DEMO_SELLER_MATCHES, 
   INITIAL_MATCH_HISTORY 
 } from './data/mockData';
-import { findTopMatches, getFacilityById, resolveCoordinates } from './matching/matchingEngine';
+import { findTopMatches, getFacilityById, resolveCoordinates, geocodeLocation } from './matching/matchingEngine';
 import { calculateImpact } from './matching/impactCalculator';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './components/LandingPage';
@@ -55,8 +55,8 @@ export default function App() {
   
   // Matching Engine State
   const [matchingFlowType, setMatchingFlowType] = useState<'seller' | 'buyer'>('seller');
-  const [matchingCandidates, setMatchingCandidates] = useState<MatchItem[]>(DEMO_BUYER_MATCHES);
-  const [activeDetailsItem, setActiveDetailsItem] = useState<MatchItem | null>(DEMO_BUYER_MATCHES[0]);
+  const [matchingCandidates, setMatchingCandidates] = useState<MatchItem[]>([]);
+  const [activeDetailsItem, setActiveDetailsItem] = useState<MatchItem | null>(null);
   
   // Matches List History
   const [matchesHistory, setMatchesHistory] = useState<MatchHistoryEntry[]>(INITIAL_MATCH_HISTORY);
@@ -124,11 +124,18 @@ export default function App() {
     setCurrentView('buy');
   };
 
-  const handleSellerSubmit = (listing: SellerListingPayload) => {
+  const handleSellerSubmit = async (listing: SellerListingPayload) => {
     setSellerListing(listing);
     setMatchingFlowType('seller');
 
-    const coords = resolveCoordinates(listing.location);
+    let coords = { lat: 18.5204, lon: 73.8567 };
+    try {
+      const geo = await geocodeLocation(listing.location);
+      coords = { lat: geo.lat, lon: geo.lon };
+    } catch {
+      coords = resolveCoordinates(listing.location);
+    }
+
     const contaminationPct = 
       listing.contamination === 'None' ? 0 :
       listing.contamination === 'Medium' ? 12 :
@@ -206,18 +213,27 @@ export default function App() {
       });
 
       setMatchingCandidates(generatedItems);
+      setActiveDetailsItem(generatedItems[0]);
     } else {
-      setMatchingCandidates(DEMO_BUYER_MATCHES);
+      setMatchingCandidates([]);
+      setActiveDetailsItem(null);
     }
 
     setCurrentView('matching');
   };
 
-  const handleBuyerSubmit = (search: BuyerSearchPayload) => {
+  const handleBuyerSubmit = async (search: BuyerSearchPayload) => {
     setBuyerSearch(search);
     setMatchingFlowType('buyer');
 
-    const coords = resolveCoordinates(search.preferredLocation);
+    let coords = { lat: 18.5204, lon: 73.8567 };
+    try {
+      const geo = await geocodeLocation(search.preferredLocation);
+      coords = { lat: geo.lat, lon: geo.lon };
+    } catch {
+      coords = resolveCoordinates(search.preferredLocation);
+    }
+
     const contaminationPct = search.qualityRequirement === 'Low contamination' ? 5 : 12;
 
     const facilityMatches = findTopMatches({
@@ -290,8 +306,10 @@ export default function App() {
       });
 
       setMatchingCandidates(generatedItems);
+      setActiveDetailsItem(generatedItems[0]);
     } else {
-      setMatchingCandidates(DEMO_SELLER_MATCHES);
+      setMatchingCandidates([]);
+      setActiveDetailsItem(null);
     }
 
     setCurrentView('matching');

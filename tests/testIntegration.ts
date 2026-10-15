@@ -187,7 +187,9 @@ async function runIntegrationSuite() {
   console.log('===============================================================\n');
 }
 
-runIntegrationSuite().catch(err => {
-  console.error('Integration suite failed:', err);
-  process.exit(1);
-});
+runIntegrationSuite()
+  .then(() => process.exit(0))
+  .catch(err => {
+    console.error('Integration suite failed:', err);
+    process.exit(1);
+  });
