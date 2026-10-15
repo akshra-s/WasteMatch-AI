@@ -21,8 +21,9 @@
 import express, { Request, Response, Router } from 'express';
 import { analyzeWaste } from '../ai/analyzeWaste';
 import { getApiKey } from '../ai/geminiClient';
-import { findTopMatches, getFacilityById, resolveCoordinates } from '../matching/matchingEngine';
+import { findTopMatches, getFacilityById, resolveCoordinates, geocodeLocation } from '../matching/matchingEngine';
 import { calculateImpact } from '../matching/impactCalculator';
+import { facilityProvider } from '../matching/facilityProvider';
 import facilitiesData from '../../data/facilities_sample.json';
 
 export const aiRouter: Router = express.Router();
@@ -123,15 +124,42 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
 
 /**
  * GET /facilities
- * Return regional sample facility dataset
+ * Return verified industrial facilities directory with provider status
  */
-aiRouter.get('/facilities', (_req: Request, res: Response) => {
+aiRouter.get('/facilities', async (req: Request, res: Response) => {
+  const includeSample = req.query.includeSample === 'true';
+  const facilities = await facilityProvider.getFacilities({ includeSample });
+  const status = facilityProvider.getProviderStatus();
+
   return res.json({
     ok: true,
-    disclaimer: facilitiesData.disclaimer,
-    dataType: facilitiesData.data_type,
-    count: facilitiesData.facilities.length,
-    data: facilitiesData.facilities
+    providerStatus: status,
+    count: facilities.length,
+    data: facilities
+  });
+});
+
+/**
+ * GET /facilities/provider-status
+ * Inspect active facility provider and configuration requirements
+ */
+aiRouter.get('/facilities/provider-status', (_req: Request, res: Response) => {
+  return res.json({
+    ok: true,
+    status: facilityProvider.getProviderStatus()
+  });
+});
+
+/**
+ * POST /geocode
+ * Live geocode an industrial location or address using OpenStreetMap Nominatim
+ */
+aiRouter.post('/geocode', async (req: Request, res: Response) => {
+  const { query } = req.body || {};
+  const result = await geocodeLocation(String(query || ''));
+  return res.json({
+    ok: true,
+    data: result
   });
 });
 

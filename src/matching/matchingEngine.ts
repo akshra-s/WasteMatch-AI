@@ -1,7 +1,28 @@
 import facilitiesData from "../../data/facilities_sample.json";
+import verifiedFacilitiesData from "../../data/facilities_directory.json";
 import type { Facility, MatchResult, WasteInput } from "./types";
+import { geocodeLocation, KNOWN_COORDINATES } from "./geocoding";
 
-const facilities: Facility[] = facilitiesData.facilities;
+export { geocodeLocation };
+
+const verifiedFacilities: Facility[] = (verifiedFacilitiesData.facilities as any[]).map(f => ({
+  ...f,
+  is_verified_real: true,
+  regulatory_registration: f.regulatory_registration || 'Verified Registry',
+  source_dataset: 'VERIFIED_REAL_DIRECTORY',
+  verification_badge: 'VERIFIED INDUSTRIAL RECYCLER'
+}));
+
+const sampleFacilities: Facility[] = (facilitiesData.facilities as any[]).map(f => ({
+  ...f,
+  is_verified_real: false,
+  regulatory_registration: 'DEMO-PROTOTYPE',
+  source_dataset: 'SAMPLE_DEMO_FIXTURE',
+  verification_badge: 'DEMO PROTOTYPE (Sample Data Only)'
+}));
+
+// Real verified facilities are prioritized; sample fixtures are explicitly labeled
+const facilities: Facility[] = [...verifiedFacilities, ...sampleFacilities];
 
 /**
  * Matching weights as specified:
@@ -271,7 +292,11 @@ export function findTopMatches(input: WasteInput, topN = 4): MatchResult[] {
       breakdown,
       whyMatched,
       estimatedAvoidedCo2Tonnes,
-      estimatedEconomicBenefitInr
+      estimatedEconomicBenefitInr,
+      isVerifiedReal: facility.is_verified_real ?? false,
+      regulatoryRegistration: facility.regulatory_registration,
+      verificationBadge: facility.verification_badge || (facility.is_verified_real ? 'VERIFIED INDUSTRIAL RECYCLER' : 'SAMPLE DEMO (Unverified)'),
+      sourceDataset: facility.source_dataset || (facility.is_verified_real ? 'VERIFIED_REAL_DIRECTORY' : 'SAMPLE_DEMO_FIXTURE')
     };
   });
 

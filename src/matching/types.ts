@@ -23,6 +23,10 @@ export interface Facility {
   estimated_reuse_value: number;
   estimated_co2_factor: number;
   is_hazardous?: boolean;
+  is_verified_real?: boolean;
+  regulatory_registration?: string;
+  source_dataset?: string;
+  verification_badge?: string;
 }
 
 export interface MatchScoreBreakdown {
@@ -54,6 +58,10 @@ export interface MatchResult {
   whyMatched: string[];
   estimatedAvoidedCo2Tonnes: number;
   estimatedEconomicBenefitInr: number;
+  isVerifiedReal?: boolean;
+  regulatoryRegistration?: string;
+  verificationBadge?: string;
+  sourceDataset?: string;
 }
 
 export interface ImpactResult {

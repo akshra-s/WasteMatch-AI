@@ -122,24 +122,47 @@ export async function triggerN8nAutomation(listing: ListingRecord): Promise<{
 
   while (currentAttempt <= maxAttempts) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'WasteMatch-AI-Automation/1.0',
-        'X-Event-ID': eventId
-      };
+      const isFormEndpoint = webhookUrl.includes('/form') || webhookUrl.includes('form-test');
+      let bodyData: any;
+      const headers: Record<string, string> = {};
 
-      if (webhookSecret) {
-        headers['Authorization'] = `Bearer ${webhookSecret}`;
-        headers['X-Webhook-Secret'] = webhookSecret;
+      if (!isFormEndpoint) {
+        headers['Content-Type'] = 'application/json';
+        headers['User-Agent'] = 'WasteMatch-AI-Automation/1.0';
+        headers['X-Event-ID'] = eventId;
+        if (webhookSecret) {
+          headers['Authorization'] = `Bearer ${webhookSecret}`;
+          headers['X-Webhook-Secret'] = webhookSecret;
+        }
+        bodyData = JSON.stringify(eventPayload);
+      } else {
+        const formData = new FormData();
+        // Exact n8n form field mapping for published Form Trigger:
+        // field-0: Waste category (select)
+        // field-1: Waste description (textarea)
+        // field-2: Condition (select)
+        // field-3: Quantity (kg) (number)
+        // field-4: Location (text)
+        // field-5: Photo URL (text)
+        // field-6: Contact email (email)
+        formData.append('field-0', mappedCategory);
+        formData.append('field-1', description);
+        formData.append('field-2', mappedCondition);
+        formData.append('field-3', String(quantityKg));
+        formData.append('field-4', listing.location || 'Pune, Maharashtra');
+        formData.append('field-5', listing.imageUrl || '');
+        const contactEmail = (process.env.N8N_SEND_EMAIL === 'true' && listing.userEmail) ? listing.userEmail : '';
+        formData.append('field-6', contactEmail);
+        bodyData = formData;
       }
 
       const res = await fetch(webhookUrl, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(eventPayload),
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+        body: bodyData,
         signal: controller.signal
       });
 
@@ -174,7 +197,8 @@ export async function triggerN8nAutomation(listing: ListingRecord): Promise<{
           message: 'n8n webhook successfully dispatched'
         };
       } else {
-        lastErrorMsg = `n8n responded with HTTP status ${res.status} ${res.statusText}`;
+        const errText = await res.text().catch(() => '');
+        lastErrorMsg = `n8n responded with HTTP status ${res.status} ${res.statusText}${errText ? `: ${errText.slice(0, 200)}` : ''}`;
       }
     } catch (err: any) {
       clearTimeout(timeout);
