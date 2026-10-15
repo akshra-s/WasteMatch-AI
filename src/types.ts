@@ -98,3 +98,38 @@ export interface MatchHistoryEntry {
   flowOrigin: 'seller' | 'buyer';
   status: 'Connected' | 'In Discussion' | 'Agreement Drafted' | 'Completed';
 }
+
+export interface ListingRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  companyName: string;
+  materialName: string;
+  materialCategory: string;
+  quantityTonnes: number;
+  unit: string;
+  expectedPricePerUnit: number;
+  location: string;
+  availability: AvailabilityStatus;
+  composition: string;
+  contamination: ContaminationLevel;
+  additionalNotes: string;
+  imageUrl?: string;
+  aiIdentifiedConfidence?: number;
+  potentialUses?: string[];
+  createdAt: string;
+  updatedAt: string;
+  status: 'active' | 'matched' | 'archived';
+  automationStatus?: 'pending' | 'success' | 'failed' | 'skipped';
+  automationEventId?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  companyName: string;
+  location: string;
+  role: 'seller' | 'buyer' | 'admin';
+  createdAt: string;
+}
+

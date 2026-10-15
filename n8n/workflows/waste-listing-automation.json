@@ -1,0 +1,185 @@
+{
+  "name": "WasteMatch AI - Listing Processing & Circular Matching Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waste-match-event",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "waste-match-event-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: Validate incoming WasteMatch AI event\nconst body = $input.first().json.body || $input.first().json;\n\nif (!body || !body.eventId || !body.listing) {\n  throw new Error('Invalid payload: Missing eventId or listing object');\n}\n\nconst listing = body.listing;\nif (!listing.id || !listing.materialName || typeof listing.quantityTonnes !== 'number') {\n  throw new Error('Invalid listing: Requires id, materialName, and quantityTonnes');\n}\n\nreturn [{\n  json: {\n    eventId: body.eventId,\n    eventType: body.eventType || 'listing.created',\n    listingId: listing.id,\n    materialName: listing.materialName,\n    materialCategory: listing.materialCategory || 'General Industrial',\n    quantityTonnes: Number(listing.quantityTonnes),\n    location: listing.location || 'Pune, India',\n    expectedPrice: listing.expectedPricePerUnit || 0,\n    contamination: listing.contamination || 'Low',\n    receivedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-validate-payload",
+      "name": "Validate & Normalize Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WASTEMATCH_API_URL || 'http://localhost:3000' }}/api/match-waste",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"wasteType\": \"{{ $json.materialName }}\",\n  \"quantityTonnes\": {{ $json.quantityTonnes }},\n  \"location\": \"{{ $json.location }}\",\n  \"contaminationPercentage\": 5\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-query-matching-api",
+      "name": "Query WasteMatch Facility Matching API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Validate & Normalize Event').first().json;\nconst matchResponse = $input.first().json;\nconst matches = matchResponse.data || [];\n\nconst topMatch = matches[0] || null;\nconst summary = topMatch \n  ? `Matched with ${topMatch.facilityName} (${topMatch.distanceKm} km away) with score ${topMatch.matchScore}%. Potential CO2 avoidance: ${topMatch.estimatedAvoidedCo2Tonnes || 0} tonnes.`\n  : 'No regional facility matches found currently.';\n\nreturn [{\n  json: {\n    eventId: prev.eventId,\n    listingId: prev.listingId,\n    materialName: prev.materialName,\n    quantityTonnes: prev.quantityTonnes,\n    matchedCount: matches.length,\n    topMatchFacility: topMatch ? topMatch.facilityName : null,\n    summaryNotes: summary,\n    matches: matches.slice(0, 3)\n  }\n}];"
+      },
+      "id": "node-format-enrichment",
+      "name": "Enrich Outcome & Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WASTEMATCH_API_URL || 'http://localhost:3000' }}/api/automation/callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Webhook-Secret",
+              "value": "={{ $env.N8N_WEBHOOK_SECRET || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"{{ $json.eventId }}\",\n  \"listingId\": \"{{ $json.listingId }}\",\n  \"status\": \"success\",\n  \"notes\": \"{{ $json.summaryNotes }}\",\n  \"matches\": {{ JSON.stringify($json.matches) }}\n}",
+        "options": {}
+      },
+      "id": "node-notify-backend-callback",
+      "name": "Send Outcome Callback to WasteMatch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"status\": \"completed\",\n  \"eventId\": \"{{ $json.eventId }}\",\n  \"listingId\": \"{{ $json.listingId }}\",\n  \"matchesFound\": {{ $json.matchedCount || 0 }},\n  \"processedAt\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-to-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize Event": {
+      "main": [
+        [
+          {
+            "node": "Query WasteMatch Facility Matching API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query WasteMatch Facility Matching API": {
+      "main": [
+        [
+          {
+            "node": "Enrich Outcome & Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Outcome & Metrics": {
+      "main": [
+        [
+          {
+            "node": "Send Outcome Callback to WasteMatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Outcome Callback to WasteMatch": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

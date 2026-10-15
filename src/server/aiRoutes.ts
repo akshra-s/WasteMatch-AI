@@ -23,6 +23,7 @@ import { analyzeWaste } from '../ai/analyzeWaste';
 import { getApiKey } from '../ai/geminiClient';
 import { findTopMatches, getFacilityById, resolveCoordinates } from '../matching/matchingEngine';
 import { calculateImpact } from '../matching/impactCalculator';
+import facilitiesData from '../../data/facilities_sample.json';
 
 export const aiRouter: Router = express.Router();
 
@@ -77,7 +78,7 @@ aiRouter.post('/analyze-waste', async (req: Request, res: Response) => {
  * Body: { composition?, wasteType?, quantityTonnes?, location? }
  */
 aiRouter.post('/match-waste', (req: Request, res: Response) => {
-  const { composition, wasteType, quantityTonnes, location } = req.body || {};
+  const { composition, wasteType, quantityTonnes, location, contaminationPercentage, budgetOrExpectedPrice, isHazardous, topN = 5 } = req.body || {};
   const queryWaste = wasteType || (Array.isArray(composition) ? composition.join(' ') : 'PET Plastic');
   const qty = Number(quantityTonnes) || 15;
   const coords = resolveCoordinates(location || 'Pune, Maharashtra');
@@ -87,8 +88,10 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     quantityTonnes: qty,
     latitude: coords.lat,
     longitude: coords.lon,
-    contaminationPercentage: 5
-  }, 5);
+    contaminationPercentage: typeof contaminationPercentage === 'number' ? contaminationPercentage : 5,
+    budgetOrExpectedPrice: typeof budgetOrExpectedPrice === 'number' ? budgetOrExpectedPrice : undefined,
+    isHazardous: Boolean(isHazardous)
+  }, Number(topN) || 5);
 
   const formattedMatches = matches.map((m, idx) => ({
     id: idx + 1,
@@ -97,6 +100,7 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     facilityName: m.facilityName,
     location: m.location,
     distanceKm: m.distanceKm,
+    distanceType: 'straight-line (Haversine formula)',
     matchScore: m.matchScore,
     method: `${m.capacityPerDay} T/day processing capacity for circular reuse`,
     demandLevel: m.matchScore > 85 ? 'High' : 'Medium',
@@ -105,13 +109,29 @@ aiRouter.post('/match-waste', (req: Request, res: Response) => {
     processingType: m.processingType,
     estimatedAvoidedCo2Tonnes: m.estimatedAvoidedCo2Tonnes,
     estimatedEconomicBenefitInr: m.estimatedEconomicBenefitInr,
+    datasetSource: 'SAMPLE_DEMO_DATA (Verified Sample Facilities Specification)'
   }));
 
   return res.json({
     ok: true,
     success: true,
-    message: 'Matches found',
+    message: matches.length > 0 ? 'Matches found' : 'No compatible facilities found for this waste stream and constraints',
+    count: matches.length,
     data: formattedMatches
+  });
+});
+
+/**
+ * GET /facilities
+ * Return regional sample facility dataset
+ */
+aiRouter.get('/facilities', (_req: Request, res: Response) => {
+  return res.json({
+    ok: true,
+    disclaimer: facilitiesData.disclaimer,
+    dataType: facilitiesData.data_type,
+    count: facilitiesData.facilities.length,
+    data: facilitiesData.facilities
   });
 });
 

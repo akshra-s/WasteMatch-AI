@@ -10,8 +10,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "test": "npm run test:matching && npm run test:ai && npm run test:integration",
     "test:matching": "tsx tests/testMatching.ts",
     "test:ai": "tsx tests/testAI.ts",
+    "test:integration": "tsx tests/testIntegration.ts",
     "ai:test": "tsx tests/testAI.ts",
     "ai:server": "tsx src/server/aiServer.ts"
   },

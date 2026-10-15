@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "id": "usr_demo_ecocement",
+      "email": "operations@ecocement.in",
+      "passwordHash": "7023e8c806dda3291453a35cbc9ae72ea3e892aa8ab0e2b96ba36f33f8986ae22a8bda7816f3a44c071391a9c3a257f5c505fcd9c40a6be494cb25b4dbc441c4",
+      "salt": "9348d5de7f5af5520d0fe579afb5ac01",
+      "companyName": "EcoCement Industries",
+      "location": "Gurgaon, Haryana",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:18:53.057Z",
+      "updatedAt": "2026-10-15T14:18:53.057Z"
+    },
+    {
+      "id": "usr_4ae2122d-bb3e-4178-a8e0-40e2794f7ee6",
+      "email": "test.operator.1792073933227@tatasteel.com",
+      "passwordHash": "1d7505fa943de540fff169f141d8e325f4f44e3fe8a912c54b82c9d2e75eb30338eff289c656f0f047b510c25dc8ad5ea4ae6847867bdb77166367486aa9b543",
+      "salt": "6dea7889508ba6b638d294711106f1e5",
+      "companyName": "Tata Steel Tubes Division",
+      "location": "Pune, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:18:53.228Z",
+      "updatedAt": "2026-10-15T14:18:53.228Z"
+    },
+    {
+      "id": "usr_96544a14-f055-47b3-8fb3-8b75ec59768b",
+      "email": "competitor.1792073933257@jsw.in",
+      "passwordHash": "1d7505fa943de540fff169f141d8e325f4f44e3fe8a912c54b82c9d2e75eb30338eff289c656f0f047b510c25dc8ad5ea4ae6847867bdb77166367486aa9b543",
+      "salt": "6dea7889508ba6b638d294711106f1e5",
+      "companyName": "JSW Steel Processing",
+      "location": "Mumbai, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:18:53.257Z",
+      "updatedAt": "2026-10-15T14:18:53.257Z"
+    },
+    {
+      "id": "usr_4775c906-27a6-4677-a491-666ffc192b07",
+      "email": "test.operator.1792073969698@tatasteel.com",
+      "passwordHash": "b33c4454b70e6cda4989e10e6b3e41ac9ca1997e7b6e8252f790030b8f1184de4b2f9f320f80c01b9772289578e08b479f3895cd268d2ac8f3388c2944e6bcc1",
+      "salt": "1211ac991eba5eb27227070dea12babb",
+      "companyName": "Tata Steel Tubes Division",
+      "location": "Pune, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:19:29.698Z",
+      "updatedAt": "2026-10-15T14:19:29.698Z"
+    },
+    {
+      "id": "usr_c6d4aead-7d4b-47d8-b755-d97b43c5697c",
+      "email": "competitor.1792073969703@jsw.in",
+      "passwordHash": "b33c4454b70e6cda4989e10e6b3e41ac9ca1997e7b6e8252f790030b8f1184de4b2f9f320f80c01b9772289578e08b479f3895cd268d2ac8f3388c2944e6bcc1",
+      "salt": "1211ac991eba5eb27227070dea12babb",
+      "companyName": "JSW Steel Processing",
+      "location": "Mumbai, Maharashtra",
+      "role": "seller",
+      "createdAt": "2026-10-15T14:19:29.703Z",
+      "updatedAt": "2026-10-15T14:19:29.703Z"
+    }
+  ],
+  "listings": [
+    {
+      "id": "lst_seed_pet_01",
+      "userId": "usr_demo_ecocement",
+      "userEmail": "operations@ecocement.in",
+      "companyName": "EcoCement Industries",
+      "materialName": "Clean Industrial PET Flakes",
+      "materialCategory": "Post-Industrial Polymers",
+      "quantityTonnes": 15,
+      "unit": "tonnes",
+      "expectedPricePerUnit": 28500,
+      "location": "Pune, Maharashtra",
+      "availability": "Available now",
+      "composition": "PET 98.5%, Trace adhesive 1.5%",
+      "contamination": "Low",
+      "additionalNotes": "Post-industrial washed bottle flakes, clear, baled and ready for logistics pickup.",
+      "imageUrl": "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=800&q=80",
+      "aiIdentifiedConfidence": 94,
+      "potentialUses": [
+        "rPET Pellets",
+        "Polyester Filament Yarn",
+        "Packaging Straps"
+      ],
+      "createdAt": "2026-10-14T14:18:53.057Z",
+      "updatedAt": "2026-10-14T14:18:53.057Z",
+      "status": "active",
+      "automationStatus": "skipped"
+    }
+  ],
+  "automationLogs": [
+    {
+      "listingId": "lst_ca2020f3-2ff8-44c9-92d2-a272d719de0f",
+      "eventType": "listing.created",
+      "status": "skipped",
+      "attempts": 0,
+      "lastError": "N8N_WEBHOOK_URL not configured",
+      "payload": {
+        "eventId": "evt_1792073933261_c88fb76d",
+        "eventType": "listing.created",
+        "timestamp": "2026-10-15T14:18:53.261Z",
+        "source": "wastematch-ai",
+        "listing": {
+          "id": "lst_ca2020f3-2ff8-44c9-92d2-a272d719de0f",
+          "materialName": "Cotton Textile Lint Residue",
+          "materialCategory": "Post-Industrial Polymers",
+          "quantityTonnes": 25,
+          "unit": "tonnes",
+          "location": "Pune, Maharashtra",
+          "expectedPricePerUnit": 18000,
+          "contamination": "Low",
+          "composition": "PP 97%, Masterbatch 3%"
+        }
+      },
+      "id": "evt_3233848d-c511-4520-892b-6717e29f41b1",
+      "createdAt": "2026-10-15T14:18:53.261Z",
+      "updatedAt": "2026-10-15T14:18:53.261Z"
+    },
+    {
+      "listingId": "lst_3cdff095-bc49-48de-9a6b-0ef2265a4fc6",
+      "eventType": "listing.created",
+      "status": "skipped",
+      "attempts": 0,
+      "lastError": "N8N_WEBHOOK_URL not configured",
+      "payload": {
+        "eventId": "evt_1792073969706_1c9327fc",
+        "eventType": "listing.created",
+        "timestamp": "2026-10-15T14:19:29.706Z",
+        "source": "wastematch-ai",
+        "listing": {
+          "id": "lst_3cdff095-bc49-48de-9a6b-0ef2265a4fc6",
+          "materialName": "Cotton Textile Lint Residue",
+          "materialCategory": "Post-Industrial Polymers",
+          "quantityTonnes": 25,
+          "unit": "tonnes",
+          "location": "Pune, Maharashtra",
+          "expectedPricePerUnit": 18000,
+          "contamination": "Low",
+          "composition": "PP 97%, Masterbatch 3%"
+        }
+      },
+      "id": "evt_b1dac4e6-8713-4520-9217-2cb887ddc747",
+      "createdAt": "2026-10-15T14:19:29.707Z",
+      "updatedAt": "2026-10-15T14:19:29.707Z"
+    }
+  ]
+}

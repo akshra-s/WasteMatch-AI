@@ -21,7 +21,7 @@ import type { AIAnalyzeRequest, AIAnalyzeResponse } from './types';
 const API_BASE =
   (typeof import.meta !== 'undefined' &&
     (import.meta as any).env?.VITE_AI_API_URL) ||
-  'http://localhost:4000';
+  '';
 
 interface HookState {
   loading: boolean;

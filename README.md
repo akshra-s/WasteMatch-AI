@@ -643,27 +643,111 @@ Our vision is to help industries move toward a **circular economy**, where mater
 # 🏆 Project Highlights
 
 * AI-powered industrial resource marketplace
-* Explainable AI matching
-* Multi-factor compatibility scoring
-* Material synonym normalization
-* Contamination-aware recommendations
-* Capacity and throughput analysis
-* Geographic distance calculation
+* Explainable AI matching with 6-factor mathematical scoring
+* Multimodal Gemini Vision image analysis with resilient fallback
+* Persistent JSON document database with schema validation & atomic writes
+* Enterprise authentication with PBKDF2 password hashing & HMAC-SHA256 session tokens
+* Server-side authorization & ownership checks for listing CRUD
+* n8n Webhook automation with importable workflow export
+* Geographic straight-line Haversine distance calculations
 * Hazardous-material safety gating
-* Economic value estimation
-* CO₂ offset estimation
-* Intelligent no-match handling
-* Automated matching and AI test suites
-* Production build verification
+* Comprehensive automated test suites (Matching, AI Vision, Integration)
 
 ---
 
-## 👥 Team GROK IS THIS TRUW
+# 🚀 Getting Started & Setup Guide
 
-**WasteMatch AI**
+### 1. Prerequisites
+- **Node.js**: v20 or v22
+- **npm**: v10+
 
+### 2. Installation
+```bash
+npm install
+```
+
+### 3. Environment Configuration
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Populate the variables:
+- `GEMINI_API_KEY`: Your Google Gemini API key.
+- `SESSION_SECRET`: Random 32+ character string for HMAC token signing.
+- `N8N_WEBHOOK_URL`: (Optional) Webhook URL provided by n8n.
+- `N8N_WEBHOOK_SECRET`: (Optional) Bearer secret token for n8n webhooks.
+- `WASTEMATCH_API_URL`: Backend URL (defaults to `http://localhost:3000`).
+
+### 4. Running the Development Server
+```bash
+npm run dev
+```
+The server will start on `http://localhost:3000` hosting both the API routes (`/api/*`) and the React SPA via Vite.
+
+---
+
+# ⚡ n8n Automation Setup (Beginner-Friendly Guide)
+
+WasteMatch AI includes an importable, pre-configured workflow file at:
+`n8n/workflows/waste-listing-automation.json`
+
+### Step-by-Step Setup:
+1. **Open n8n**:
+   - Log into your n8n instance (Cloud or self-hosted).
+2. **Import Workflow**:
+   - In n8n, click **Workflows** → **Add Workflow** (or **Import from File**).
+   - Select `n8n/workflows/waste-listing-automation.json` from this repository.
+3. **Configure Environment Variables in n8n**:
+   - Set `WASTEMATCH_API_URL` to your accessible server URL (e.g., `http://localhost:3000` or your deployed domain).
+   - If using webhook authentication, set `N8N_WEBHOOK_SECRET` in n8n's environment or workflow settings.
+4. **Test the Workflow**:
+   - In n8n, click the **Webhook Trigger** node.
+   - Copy the **Test URL** (format: `https://.../webhook-test/waste-match-event`).
+   - Paste this URL as `N8N_WEBHOOK_URL` in your `.env`.
+   - In n8n, click **Listen for Test Event**.
+   - In WasteMatch AI, create a listing in the **Sell** flow.
+   - Verify the event appears in n8n, gets validated, queries the matching engine, and responds.
+5. **Activate Production**:
+   - Switch the URL in `.env` to the **Production URL** (format: `https://.../webhook/waste-match-event`).
+   - Toggle the workflow switch to **Active / Published** in n8n.
+   - Restart the server: `npm run dev`.
+
+*Note: If n8n is offline or unreachable, listings are still saved safely in the database without any loss of data.*
+
+---
+
+# 🧪 Running Automated Tests
+
+Run the full automated test suite:
+```bash
+npm test
+```
+Or run individual test suites:
+- Matching Engine: `npm run test:matching`
+- AI Vision & Schema: `npm run test:ai`
+- Full-Stack Integration & Security: `npm run test:integration`
+- TypeScript Typecheck: `npm run lint`
+
+---
+
+# 📦 Production Build & Deployment
+
+To compile for production:
+```bash
+npm run build
+```
+This builds the client assets into `dist/` and bundles `server.ts` into `dist/server.cjs`.
+
+To run the production server:
+```bash
+npm start
+```
+
+---
+
+## 👥 Team
 **Vishesh Agrawal • Dishita Singh • Akshra Srivastava • Akshara Singh**
 
 ### ♻️ One industry's waste can become another industry's resource.
-
 **WasteMatch AI | Match Waste. Create Value. Build a Circular Future.**
+

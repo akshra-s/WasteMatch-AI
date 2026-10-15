@@ -138,18 +138,60 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
     setStep(2);
   };
 
-  const handleFinalSubmit = (e: React.FormEvent) => {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAiLoadingMatch(true);
-    
-    // Simulate AI ranking matching pipeline
-    setTimeout(() => {
-      setIsAiLoadingMatch(false);
+    setSubmitError(null);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const token = localStorage.getItem('wastematch_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch('/api/listings', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          materialName: formData.materialName || 'Industrial Polymer Stream',
+          materialCategory: formData.materialCategory || 'Industrial Secondary Material',
+          quantityTonnes: Number(formData.quantityTonnes) || 10,
+          unit: formData.unit || 'tonnes',
+          expectedPricePerUnit: Number(formData.expectedPricePerUnit) || 0,
+          location: formData.location || 'Pune, Maharashtra',
+          availability: formData.availability || 'Available now',
+          composition: formData.composition || '',
+          contamination: formData.contamination || 'Low',
+          additionalNotes: formData.additionalNotes || '',
+          imageUrl: uploadedImage,
+          aiIdentifiedConfidence: formData.aiIdentifiedConfidence,
+          potentialUses: formData.potentialUses
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok && res.status !== 401) {
+        throw new Error(json.error || 'Failed to save listing');
+      }
+
+      const persisted = json?.data;
       onStartMatching({
         ...formData,
         imageUrl: uploadedImage
       });
-    }, 1800);
+    } catch (err: any) {
+      console.warn('[SellerFlow] Server save warning, proceeding with matching:', err);
+      // Still proceed so user experience is not blocked
+      onStartMatching({
+        ...formData,
+        imageUrl: uploadedImage
+      });
+    } finally {
+      setIsAiLoadingMatch(false);
+    }
   };
 
   return (

@@ -3,7 +3,7 @@ import { ArrowRight, Factory, Recycle, Sparkles, CheckCircle2, Shield } from 'lu
 import { Logo } from './Logo';
 
 interface LoginPageProps {
-  onLoginSuccess: (email: string) => void;
+  onLoginSuccess: (user: { email: string; companyName: string; location: string; token: string }) => void;
   onBackToLanding: () => void;
 }
 
@@ -11,25 +11,80 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess,
   onBackToLanding
 }) => {
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('operations@ecocement.in');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState('password123');
+  const [companyName, setCompanyName] = useState('EcoCement Industries');
+  const [location, setLocation] = useState('Gurgaon, Haryana');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMsg(null);
+
+    const endpoint = mode === 'signin' ? '/api/auth/login' : '/api/auth/register';
+    const payload = mode === 'signin'
+      ? { email, password }
+      : { email, password, companyName, location };
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Authentication failed. Please check credentials.');
+      }
+
+      // Store persistent session token
+      if (data.token) {
+        localStorage.setItem('wastematch_token', data.token);
+      }
+
+      onLoginSuccess({
+        email: data.user.email,
+        companyName: data.user.companyName,
+        location: data.user.location,
+        token: data.token
+      });
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Authentication error');
+    } finally {
       setIsLoading(false);
-      onLoginSuccess(email || 'company@ecocement.in');
-    }, 600);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleDemoSignIn = async () => {
+    setEmail('operations@ecocement.in');
+    setPassword('password123');
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMsg(null);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'operations@ecocement.in', password: 'password123' })
+      });
+      const data = await res.json();
+      if (data.ok && data.token) {
+        localStorage.setItem('wastematch_token', data.token);
+        onLoginSuccess({
+          email: data.user.email,
+          companyName: data.user.companyName,
+          location: data.user.location,
+          token: data.token
+        });
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to connect');
+    } finally {
       setIsLoading(false);
-      onLoginSuccess('company.admin@google.com');
-    }, 600);
+    }
   };
 
   return (
@@ -129,16 +184,80 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         {/* RIGHT SIDE (Clean White Form) */}
         <div className="lg:col-span-6 p-8 sm:p-12 lg:p-16 flex flex-col justify-center max-w-md mx-auto w-full">
           
-          <div className="mb-8">
+          <div className="mb-6">
+            <div className="flex items-center gap-2 p-1 bg-[#EFF9F2] rounded-xl border border-[#D9F2E3] mb-5 w-fit">
+              <button
+                type="button"
+                onClick={() => { setMode('signin'); setErrorMsg(null); }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  mode === 'signin' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#4A6054] hover:text-[#0B3D2E]'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('signup'); setErrorMsg(null); }}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  mode === 'signup' ? 'bg-[#0B3D2E] text-white shadow-xs' : 'text-[#4A6054] hover:text-[#0B3D2E]'
+                }`}
+              >
+                Register Company
+              </button>
+            </div>
+
             <h2 className="font-heading font-extrabold text-3xl text-[#0B3D2E] tracking-tight">
-              Welcome to WasteMatch
+              {mode === 'signin' ? 'Welcome to WasteMatch' : 'Create Organization Account'}
             </h2>
             <p className="text-sm text-[#4A6054] mt-1.5 font-medium">
-              Sign in to access your industrial waste matching workspace.
+              {mode === 'signin'
+                ? 'Sign in to access your industrial waste matching workspace.'
+                : 'Join verified regional industrial circularity networks.'}
             </p>
           </div>
 
+          {errorMsg && (
+            <div className="mb-5 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+              <div className="font-medium">{errorMsg}</div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4" id="login-form">
+            {mode === 'signup' && (
+              <>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#0B3D2E] mb-1.5" htmlFor="company-name">
+                    Company Name
+                  </label>
+                  <input
+                    id="company-name"
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Tata Steel Processing"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-[#D9F2E3] bg-[#F8FBF9] text-[#0B3D2E] text-sm focus:outline-hidden focus:border-[#238B5A] focus:ring-2 focus:ring-[#EFF9F2] transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#0B3D2E] mb-1.5" htmlFor="facility-location">
+                    Industrial Facility Location
+                  </label>
+                  <input
+                    id="facility-location"
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Pune, Maharashtra"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-[#D9F2E3] bg-[#F8FBF9] text-[#0B3D2E] text-sm focus:outline-hidden focus:border-[#238B5A] focus:ring-2 focus:ring-[#EFF9F2] transition-all"
+                  />
+                </div>
+              </>
+            )}
+
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#0B3D2E] mb-1.5" htmlFor="work-email">
                 Work Email
@@ -159,16 +278,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#0B3D2E]" htmlFor="password">
                   Password
                 </label>
-                <a href="#forgot" onClick={(e) => e.preventDefault()} className="text-xs text-[#238B5A] hover:underline font-semibold">
-                  Forgot password?
-                </a>
+                {mode === 'signin' && (
+                  <span className="text-xs text-[#238B5A] font-semibold">
+                    Demo: password123
+                  </span>
+                )}
               </div>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
+                placeholder="Minimum 6 characters"
                 required
                 className="w-full px-4 py-3 rounded-xl border border-[#D9F2E3] bg-[#F8FBF9] text-[#0B3D2E] text-sm focus:outline-hidden focus:border-[#238B5A] focus:ring-2 focus:ring-[#EFF9F2] transition-all"
               />
@@ -177,66 +298,42 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 py-3.5 px-4 rounded-xl bg-[#0B3D2E] hover:bg-[#146B4A] text-white font-heading font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              className="w-full mt-2 py-3.5 px-4 rounded-xl bg-[#0B3D2E] hover:bg-[#146B4A] text-white font-heading font-bold text-sm shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-70"
               id="submit-signin-btn"
             >
               {isLoading ? (
-                <span>Signing in...</span>
+                <span>Processing...</span>
               ) : (
                 <>
-                  <span>Sign in</span>
+                  <span>{mode === 'signin' ? 'Sign in to Workspace' : 'Create Company Account'}</span>
                   <ArrowRight className="w-4 h-4 text-[#35A66F]" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6 text-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E8F3ED]" />
-            </div>
-            <div className="relative inline-block px-3 bg-white text-[11px] text-[#60756A] font-bold uppercase tracking-wider">
-              OR
-            </div>
+          {/* Quick Demo Login Option */}
+          <div className="mt-4 pt-4 border-t border-[#E8F3ED]">
+            <button
+              type="button"
+              onClick={handleDemoSignIn}
+              disabled={isLoading}
+              className="w-full py-2.5 px-3 rounded-xl border border-[#238B5A]/30 bg-[#EFF9F2] hover:bg-[#D9F2E3] text-[#0B3D2E] text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#238B5A]" />
+              <span>Sign in with Demo Account (EcoCement Industries)</span>
+            </button>
           </div>
 
-          {/* Google SSO */}
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full py-3 px-4 rounded-xl border border-[#D9F2E3] hover:bg-[#F8FBF9] text-[#0B3D2E] font-semibold text-sm transition-all flex items-center justify-center gap-3 cursor-pointer shadow-2xs"
-            id="google-signin-btn"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#EA4335"
-                d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-              />
-              <path
-                fill="#4285F4"
-                d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12 0 12s.7 2.3 1.9 4.7l3.7-2.9z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
-              />
-            </svg>
-            <span>Continue with Google</span>
-          </button>
-
-          {/* Sign up link */}
-          <p className="text-center text-xs text-[#60756A] mt-6">
-            Don't have an account?{' '}
+          {/* Toggle link */}
+          <p className="text-center text-xs text-[#60756A] mt-5">
+            {mode === 'signin' ? "Don't have an account? " : "Already have an account? "}
             <button
-              onClick={() => onLoginSuccess('new.company@waste.com')}
+              type="button"
+              onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setErrorMsg(null); }}
               className="text-[#238B5A] font-bold hover:underline cursor-pointer"
             >
-              Create account
+              {mode === 'signin' ? 'Register your company' : 'Sign in'}
             </button>
           </p>
 

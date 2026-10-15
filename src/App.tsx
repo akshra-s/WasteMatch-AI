@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   SellerListingPayload, 
   BuyerSearchPayload, 
@@ -61,17 +61,46 @@ export default function App() {
   // Matches List History
   const [matchesHistory, setMatchesHistory] = useState<MatchHistoryEntry[]>(INITIAL_MATCH_HISTORY);
 
+  // Auto-login from stored token
+  useEffect(() => {
+    const token = localStorage.getItem('wastematch_token');
+    if (token) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok && data.user) {
+          setSession({
+            isLoggedIn: true,
+            userEmail: data.user.email,
+            companyName: data.user.companyName,
+            currentLocation: data.user.location
+          });
+        } else {
+          localStorage.removeItem('wastematch_token');
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('wastematch_token');
+      });
+    }
+  }, []);
+
   // Navigation handlers
-  const handleLoginSuccess = (email: string) => {
-    setSession((prev) => ({
-      ...prev,
+  const handleLoginSuccess = (user: { email: string; companyName: string; location: string; token: string }) => {
+    setSession({
       isLoggedIn: true,
-      userEmail: email
-    }));
+      userEmail: user.email,
+      companyName: user.companyName,
+      currentLocation: user.location
+    });
     setCurrentView('home');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('wastematch_token');
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setSession((prev) => ({
       ...prev,
       isLoggedIn: false
