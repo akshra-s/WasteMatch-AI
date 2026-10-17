@@ -179,7 +179,7 @@ export async function callGeminiVision(
       });
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 7000);
+        timer = setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 30000);
       });
 
       const response = await Promise.race([generatePromise, timeoutPromise]);
